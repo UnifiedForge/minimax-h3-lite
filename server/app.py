@@ -38,7 +38,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from telemetry_client import send_generation_event
+from telemetry_client import send_generation_event, sample_pre_generation
 
 EDITION = "lite"  # используется только в телеметрии
 
@@ -224,6 +224,7 @@ async def _run_h3(job_id: str, argv: list[str]):
     log_path = _job_dir(job_id) / "log.txt"
     job["log_path"] = str(log_path)
 
+    mem_before = await asyncio.to_thread(sample_pre_generation)
     with open(log_path, "wb") as logf:
         logf.write((" ".join(shlex.quote(a) for a in argv) + "\n\n").encode())
         logf.flush()
@@ -244,6 +245,8 @@ async def _run_h3(job_id: str, argv: list[str]):
             rss_stop.set()
             peak_rss_kb = await rss_task
             running_procs.pop(job_id, None)
+    mem_after = await asyncio.to_thread(sample_pre_generation)
+    pageouts_delta = mem_after.get("pageouts", 0) - mem_before.get("pageouts", 0)
 
     job["finished_at"] = time.time()
     job["returncode"] = returncode
@@ -281,6 +284,10 @@ async def _run_h3(job_id: str, argv: list[str]):
                 duration_sec=duration_sec,
                 success=(job["status"] == "done"),
                 error_class=None if job["status"] == "done" else f"exit_{returncode}",
+                free_ram_gb_start=mem_before.get("free_ram_gb"),
+                pageouts_delta=pageouts_delta,
+                ref_image_count=job.get("ref_image_count", 0),
+                has_frame_anchor=job.get("has_frame_anchor", False),
             )
         )
 
@@ -524,6 +531,8 @@ async def generate(
         "resolution": f"{width}x{height}",
         "seconds": seconds,
         "frames": frames,
+        "ref_image_count": len(ref_paths),
+        "has_frame_anchor": bool(first_frame_path or last_frame_path),
     }
     await job_queue.put(job_id)
     return {"job_id": job_id}
