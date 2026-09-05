@@ -25,8 +25,8 @@ from pathlib import Path
 # фильтр случайного шума). Так телеметрию шлют все инсталляции по умолчанию,
 # а не только машина разработчика. Переменные окружения — только чтобы можно
 # было переопределить/выключить локально при отладке.
-_DEFAULT_TELEMETRY_URL = ""  # TODO: подставить после деплоя (DEPLOY.md) — https://telemetry.ТВОЙДОМЕН.tld/v1/events
-_DEFAULT_TELEMETRY_KEY = ""  # TODO: подставить после деплоя — ключ из DEPLOY.md
+_DEFAULT_TELEMETRY_URL = "https://telemetry.unifiedforge.dev/v1/events"
+_DEFAULT_TELEMETRY_KEY = "14093ee186cd2d66bfe96947499d0ac47fe00fdde0706d47"
 
 TELEMETRY_ENABLED = os.environ.get("H3_TELEMETRY", "1") != "0"
 TELEMETRY_URL = os.environ.get("H3_TELEMETRY_URL", _DEFAULT_TELEMETRY_URL)
