@@ -22,3 +22,5 @@ engine/download.log
 
 # отладочные артефакты (Rosetta-баг с ярлыками), не для репозитория
 _old_*.app.bak/
+
+server/.install_id

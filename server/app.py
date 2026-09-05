@@ -38,6 +38,10 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from telemetry_client import send_generation_event
+
+EDITION = "lite"  # используется только в телеметрии
+
 # --- пути -------------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -186,6 +190,33 @@ def _job_dir(job_id: str) -> Path:
     return d
 
 
+async def _poll_peak_rss_kb(pid: int, stop: asyncio.Event) -> int:
+    """Каждую секунду смотрит RSS процесса h3 через ps, возвращает пик за всё
+    время его жизни. Это именно память самого движка (Metal/Accelerate
+    работают потоками в этом же процессе, не форкают детей) — то, что нужно
+    для RAM-таблицы, в отличие от resource.getrusage(RUSAGE_CHILDREN), который
+    даёт кумулятивный максимум по ВСЕМ когда-либо завершённым дочерним
+    процессам этого сервера, а не по конкретному job."""
+    peak_kb = 0
+    while not stop.is_set():
+        try:
+            p = await asyncio.create_subprocess_exec(
+                "ps", "-o", "rss=", "-p", str(pid),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            )
+            out, _ = await p.communicate()
+            val = int(out.decode().strip() or 0)
+            if val > peak_kb:
+                peak_kb = val
+        except Exception:
+            pass
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=1.0)
+        except asyncio.TimeoutError:
+            pass
+    return peak_kb
+
+
 async def _run_h3(job_id: str, argv: list[str]):
     job = jobs[job_id]
     job["status"] = "running"
@@ -205,13 +236,18 @@ async def _run_h3(job_id: str, argv: list[str]):
         )
         job["pid"] = proc.pid
         running_procs[job_id] = proc
+        rss_stop = asyncio.Event()
+        rss_task = asyncio.create_task(_poll_peak_rss_kb(proc.pid, rss_stop))
         try:
             returncode = await proc.wait()
         finally:
+            rss_stop.set()
+            peak_rss_kb = await rss_task
             running_procs.pop(job_id, None)
 
     job["finished_at"] = time.time()
     job["returncode"] = returncode
+    duration_sec = job["finished_at"] - job["started_at"]
     if job["status"] == "cancelled":
         pass  # уже помечено через /cancel — не перетираем на "error" из-за SIGTERM
     else:
@@ -228,6 +264,25 @@ async def _run_h3(job_id: str, argv: list[str]):
                 job["image_error"] = str(e)
                 with open(log_path, "ab") as logf:
                     logf.write(f"h3-wrapper: не удалось выбрать кадр из клипа: {e}\n".encode())
+
+    if job["status"] in ("done", "error"):
+        # анонимная телеметрия (см. telemetry_client.py) — fire-and-forget,
+        # никогда не должна задерживать или ронять сам job
+        asyncio.create_task(
+            asyncio.to_thread(
+                send_generation_event,
+                edition=EDITION,
+                mode=job.get("mode", "video"),
+                preset=job.get("preset", ""),
+                resolution=job.get("resolution", ""),
+                seconds=job.get("seconds"),
+                frames=job.get("frames"),
+                peak_rss_mb=(peak_rss_kb / 1024) if peak_rss_kb else None,
+                duration_sec=duration_sec,
+                success=(job["status"] == "done"),
+                error_class=None if job["status"] == "done" else f"exit_{returncode}",
+            )
+        )
 
 
 def _terminate_job(job_id: str) -> bool:
@@ -465,6 +520,10 @@ async def generate(
         "prompt": prompt,
         "argv": argv,
         "mode": mode,
+        "preset": preset,
+        "resolution": f"{width}x{height}",
+        "seconds": seconds,
+        "frames": frames,
     }
     await job_queue.put(job_id)
     return {"job_id": job_id}
