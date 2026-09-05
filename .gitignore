@@ -1,0 +1,24 @@
+# виртуальное окружение, кэши
+server/venv/
+server/__pycache__/
+__pycache__/
+*.pyc
+
+# рантайм-данные — генерятся заново, в гит не нужны
+server/jobs/
+outputs/
+server/launcher.log
+
+# движок и веса — по умолчанию качаются сюда сами (self-contained clone),
+# 196GB в гит не кладём вообще
+engine/
+engine/download.log
+
+# локальный оверрайд путей для машины разработчика (см. .h3env)
+.h3env
+
+# системный мусор
+.DS_Store
+
+# отладочные артефакты (Rosetta-баг с ярлыками), не для репозитория
+_old_*.app.bak/

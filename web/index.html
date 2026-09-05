@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniMax H3 — local</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #2a2e38; --text: #e8e9ec;
+    --muted: #8b909c; --accent: #7c9eff; --accent-hover: #9db4ff;
+    --danger: #ff6b6b; --ok: #4ecb85;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial, sans-serif;
+    display: grid; grid-template-columns: 420px 1fr; min-height: 100vh;
+  }
+  aside {
+    padding: 24px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
+  }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  textarea, input[type=text], input[type=number], select {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 8px; font-size: 14px; width: 100%; font-family: inherit;
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .tabs { display: flex; gap: 6px; }
+  .tab {
+    flex: 1; text-align: center; padding: 7px; border-radius: 8px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); font-size: 13px; color: var(--muted);
+  }
+  .tab.active { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .file-drop {
+    border: 1px dashed var(--border); border-radius: 8px; padding: 10px; font-size: 12px;
+    color: var(--muted); text-align: center; cursor: pointer;
+  }
+  .file-drop.filled { border-color: var(--accent); color: var(--text); }
+  button.primary {
+    background: var(--accent); color: #0b0d12; border: none; border-radius: 10px;
+    padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { background: var(--accent-hover); }
+  button.primary:disabled { opacity: .5; cursor: default; }
+  .hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  video, .video-wrap img { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 12px; background: #000; display: block; }
+  .job-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--panel); }
+  .job-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .status { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+  .status.running { color: var(--accent); border-color: var(--accent); }
+  .status.done { color: var(--ok); border-color: var(--ok); }
+  .status.error { color: var(--danger); border-color: var(--danger); }
+  .status.queued { color: var(--muted); }
+  .status.cancelled { color: var(--danger); border-color: var(--danger); }
+  button.cancel {
+    background: transparent; border: 1px solid var(--danger); color: var(--danger);
+    border-radius: 8px; padding: 3px 10px; font-size: 12px; cursor: pointer; margin-left: 8px;
+  }
+  button.cancel:hover { background: var(--danger); color: #0b0d12; }
+  pre.log {
+    background: #0a0b0f; border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+    font-size: 11px; max-height: 220px; overflow: auto; white-space: pre-wrap; color: #9aa0ac;
+  }
+  .prompt-line { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .ref-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .ref-item img {
+    width: 36px; height: 36px; object-fit: cover; border-radius: 6px;
+    border: 1px solid var(--border); flex-shrink: 0; background: #000;
+  }
+  .ref-item .name {
+    flex: 1; font-size: 12px; color: var(--text); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ref-item a.rm { color: var(--danger); text-decoration: none; flex-shrink: 0; padding: 0 4px; }
+</style>
+</head>
+<body>
+
+<aside>
+  <div>
+    <h1>Тип генерации</h1>
+    <div class="tabs">
+      <div class="tab active" data-mode="video">Видео</div>
+      <div class="tab" data-mode="image">Картинка</div>
+    </div>
+    <div class="hint" id="mode-hint" style="margin-top:6px;"></div>
+  </div>
+
+  <div>
+    <h1>Промпт</h1>
+    <div class="field"><textarea id="prompt" placeholder="Scene: ... Action: ... Camera: ... Look: ... Audio: ..."></textarea></div>
+    <div class="hint" style="margin-top:6px;">Промпт-энхенсер (авто-развёртывание промпта локальной LLM) — фича Pro.</div>
+  </div>
+
+  <div>
+    <h1>Референсы</h1>
+    <div class="tabs">
+      <div class="tab active" data-ref-mode="none">Нет</div>
+      <div class="tab" data-ref-mode="anchor">First/Last frame</div>
+      <div class="tab" data-ref-mode="ref">Reference images</div>
+    </div>
+
+    <div id="ref-anchor" class="panel" style="display:none; margin-top:10px;">
+      <div class="row">
+        <div class="field">
+          <label>Первый кадр</label>
+          <div class="file-drop" data-input="first_frame">выбрать файл</div>
+        </div>
+        <div class="field">
+          <label>Последний кадр</label>
+          <div class="file-drop" data-input="last_frame">выбрать файл</div>
+        </div>
+      </div>
+      <input type="file" id="first_frame" accept="image/*" hidden>
+      <input type="file" id="last_frame" accept="image/*" hidden>
+    </div>
+
+    <div id="ref-images" class="panel" style="display:none; margin-top:10px;">
+      <div class="file-drop" data-input="ref_images">добавить референс-картинки (до 3, порядок важен)</div>
+      <input type="file" id="ref_images" accept="image/*" multiple hidden>
+      <div id="ref-list" class="hint" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <div>
+    <h1>Кадр</h1>
+    <div class="row">
+      <div class="field">
+        <label>Разрешение</label>
+        <select id="resolution">
+          <optgroup label="Вертикальное 9:16">
+            <option value="288x512" selected>288×512 — быстро</option>
+            <option value="480x864">480×864 — среднее</option>
+            <option value="768x1344">768×1344 — макс. качество</option>
+          </optgroup>
+          <optgroup label="Горизонтальное 16:9">
+            <option value="512x288">512×288 — быстро</option>
+            <option value="864x480">864×480 — среднее</option>
+            <option value="1344x768">1344×768 — макс. качество</option>
+          </optgroup>
+          <optgroup label="Квадрат 1:1">
+            <option value="512x512">512×512 — быстро</option>
+            <option value="768x768">768×768 — макс. качество</option>
+          </optgroup>
+          <optgroup label="4:3 / 3:4">
+            <option value="1024x768">1024×768 — горизонтальное</option>
+            <option value="768x1024">768×1024 — вертикальное</option>
+          </optgroup>
+          <optgroup label="Служебное">
+            <option value="256x256">256×256 — превью</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="field" id="duration-field">
+        <label>Длительность, сек</label>
+        <input type="number" id="seconds" value="1" step="0.5" min="0.5">
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h1>Скорость / качество</h1>
+    <div class="tabs">
+      <div class="tab" data-preset="draft">Draft<br><span class="hint">4 шага</span></div>
+      <div class="tab active" data-preset="balanced">Balanced<br><span class="hint">20 шагов</span></div>
+      <div class="tab" data-preset="quality">Quality<br><span class="hint">50 шагов</span></div>
+      <div class="tab" data-preset="custom">Custom</div>
+    </div>
+    <div id="custom-params" class="row" style="display:none; margin-top:10px;">
+      <div class="field"><label>steps</label><input type="number" id="steps" value="20"></div>
+      <div class="field"><label>layers</label><input type="number" id="layers" value="45"></div>
+      <div class="field"><label>reuse</label><input type="number" id="reuse" value="2"></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>Seed (пусто = 42 по умолчанию h3)</label>
+      <input type="number" id="seed" placeholder="42">
+    </div>
+  </div>
+
+  <button class="primary" id="generate">Generate</button>
+  <div class="hint">Balanced ≈ 512² за секунды на M5 Max. Quality заметно дороже — используй для финального прохода, не для итераций.</div>
+</aside>
+
+<main>
+  <h1>Задачи</h1>
+  <div id="jobs"></div>
+</main>
+
+<script>
+const API = "";
+let refMode = "none";
+let genMode = "video";
+let selectedFirstFrame = null, selectedLastFrame = null, selectedRefImages = [];
+
+const MODE_HINTS = {
+  video: "",
+  image: "h3.c не умеет генерить одну картинку напрямую — просит у движка минимальный клип (22 кадра, ~0.9 сек) и сам выбирает самый резкий кадр (тот же принцип, что best_quality в оригинальном TI2I-воркфлоу).",
+};
+document.querySelectorAll('[data-mode]').forEach(el => el.addEventListener('click', () => {
+  document.querySelectorAll('[data-mode]').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  genMode = el.dataset.mode;
+  document.getElementById('duration-field').style.display = genMode === 'image' ? 'none' : 'flex';
+  document.getElementById('mode-hint').textContent = MODE_HINTS[genMode] || '';
+  document.getElementById('generate').textContent = genMode === 'image' ? 'Generate image' : 'Generate';
+}));
+
+document.querySelectorAll('[data-ref-mode]').forEach(el => el.addEventListener('click', () => {
+  document.querySelectorAll('[data-ref-mode]').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  refMode = el.dataset.refMode;
+  document.getElementById('ref-anchor').style.display = refMode === 'anchor' ? 'block' : 'none';
+  document.getElementById('ref-images').style.display = refMode === 'ref' ? 'block' : 'none';
+}));
+
+document.querySelectorAll('[data-preset]').forEach(el => el.addEventListener('click', () => {
+  document.querySelectorAll('[data-preset]').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('custom-params').style.display = el.dataset.preset === 'custom' ? 'flex' : 'none';
+}));
+
+document.querySelectorAll('.file-drop').forEach(el => el.addEventListener('click', () => {
+  document.getElementById(el.dataset.input).click();
+}));
+
+document.getElementById('first_frame').addEventListener('change', e => {
+  selectedFirstFrame = e.target.files[0] || null;
+  document.querySelector('[data-input=first_frame]').textContent = selectedFirstFrame ? selectedFirstFrame.name : 'выбрать файл';
+  document.querySelector('[data-input=first_frame]').classList.toggle('filled', !!selectedFirstFrame);
+});
+document.getElementById('last_frame').addEventListener('change', e => {
+  selectedLastFrame = e.target.files[0] || null;
+  document.querySelector('[data-input=last_frame]').textContent = selectedLastFrame ? selectedLastFrame.name : 'выбрать файл';
+  document.querySelector('[data-input=last_frame]').classList.toggle('filled', !!selectedLastFrame);
+});
+document.getElementById('ref_images').addEventListener('change', e => {
+  // <input multiple> при повторном открытии диалога ЗАМЕНЯЕТ файлы, а не
+  // добавляет — поэтому копим сами, чтобы можно было докидывать картинки
+  // по одной/пачками, как отдельные Add_Image-слоты в комфи.
+  for (const f of Array.from(e.target.files)) {
+    if (selectedRefImages.length >= 3) break;  // Lite: лимит 3 (Pro — 9)
+    selectedRefImages.push(f);
+  }
+  e.target.value = ''; // иначе повторный выбор того же файла не даст следующего change
+  renderRefList();
+});
+
+// один и тот же File может рендериться в список много раз (после каждого
+// add/remove) — кэшируем object URL на самом File, а не создаём заново.
+function previewUrl(f) {
+  if (!f._previewUrl) f._previewUrl = URL.createObjectURL(f);
+  return f._previewUrl;
+}
+
+function renderRefList() {
+  const list = document.getElementById('ref-list');
+  list.innerHTML = '';
+  selectedRefImages.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'ref-item';
+
+    const img = document.createElement('img');
+    img.src = previewUrl(f);
+    item.appendChild(img);
+
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = `${i + 1}. ${f.name}`;
+    item.appendChild(name);
+
+    const rm = document.createElement('a');
+    rm.href = '#';
+    rm.className = 'rm';
+    rm.textContent = '✕';
+    rm.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      if (f._previewUrl) URL.revokeObjectURL(f._previewUrl);
+      selectedRefImages.splice(i, 1);
+      renderRefList();
+    });
+    item.appendChild(rm);
+
+    list.appendChild(item);
+  });
+  const drop = document.querySelector('[data-input=ref_images]');
+  drop.classList.toggle('filled', selectedRefImages.length > 0);
+  drop.textContent = selectedRefImages.length >= 3
+    ? 'максимум 3 референса (в Pro — до 9)'
+    : 'добавить референс-картинки (до 3, порядок важен)';
+}
+
+function activePreset() {
+  return document.querySelector('[data-preset].active').dataset.preset;
+}
+
+async function generate() {
+  const [w, h] = document.getElementById('resolution').value.split('x').map(Number);
+  const fd = new FormData();
+  fd.append('prompt', document.getElementById('prompt').value);
+  fd.append('width', w);
+  fd.append('height', h);
+  fd.append('mode', genMode);
+  if (genMode !== 'image') fd.append('seconds', document.getElementById('seconds').value);
+  fd.append('preset', activePreset());
+  if (activePreset() === 'custom') {
+    fd.append('steps', document.getElementById('steps').value);
+    fd.append('layers', document.getElementById('layers').value);
+    fd.append('reuse', document.getElementById('reuse').value);
+  }
+  const seed = document.getElementById('seed').value;
+  if (seed) fd.append('seed', seed);
+
+  if (refMode === 'anchor') {
+    if (selectedFirstFrame) fd.append('first_frame', selectedFirstFrame);
+    if (selectedLastFrame) fd.append('last_frame', selectedLastFrame);
+  } else if (refMode === 'ref') {
+    selectedRefImages.forEach(f => fd.append('ref_images', f));
+  }
+
+  const btn = document.getElementById('generate');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/generate', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({detail: res.statusText}));
+      alert('Ошибка: ' + (err.detail || res.statusText));
+      return;
+    }
+    await refreshJobs();
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('generate').addEventListener('click', generate);
+
+function formatHMS(totalSeconds) {
+  const s = Math.floor(totalSeconds % 60);
+  const m = Math.floor((totalSeconds / 60) % 60);
+  const h = Math.floor(totalSeconds / 3600);
+  const pad = n => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+function fmtElapsed(job) {
+  if (!job.started_at) return '';
+  const end = job.finished_at || (Date.now()/1000);
+  const secs = end - job.started_at;
+  return `${secs.toFixed(1)}s (${formatHMS(secs)})`;
+}
+
+// какие job-карточки пользователь сам раскрыл/закрыл — переживает перерисовку
+const openJobs = new Set();
+
+document.getElementById('jobs').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-cancel]');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    await fetch('/api/jobs/' + btn.dataset.cancel + '/cancel', { method: 'POST' });
+  } finally {
+    await refreshJobs();
+  }
+});
+
+// h3 сам пишет прогресс в терминальном стиле: '\r<фаза>  N/M' поверх
+// той же строки, и настоящий '\n' только когда фаза целиком завершилась.
+// Сервер (_render_terminal в app.py) уже эмулирует курсор и отдаёт готовый,
+// свёрнутый по фазам текст — клиенту сворачивать больше нечего.
+
+// job_id -> { card, pre, statusEl, cancelWrap, video, details, lastLog }
+// ВАЖНО: карточки создаются один раз и потом только точечно обновляются —
+// полный innerHTML-снос каждые 2 сек ломал скролл страницы, скролл лога и
+// перезапускал загрузку <video> (отсюда крутилка и "растянутое" видео).
+const cardRefs = new Map();
+
+function buildCard(job) {
+  const card = document.createElement('div');
+  card.className = 'job-card';
+  card.dataset.jobId = job.id;
+  card.innerHTML = `
+    <div class="job-head">
+      <div class="prompt-line"></div>
+      <div>
+        <span class="status"></span>
+        <span class="cancel-wrap"></span>
+      </div>
+    </div>
+    <div class="video-wrap"></div>
+    <details data-job-id="${job.id}">
+      <summary class="hint">лог</summary>
+      <pre class="log"></pre>
+    </details>
+  `;
+  card.querySelector('.prompt-line').textContent = (job.prompt || '').slice(0, 90);
+  const details = card.querySelector('details');
+  details.addEventListener('toggle', () => {
+    if (details.open) { openJobs.add(job.id); openJobs.delete('__closed:' + job.id); }
+    else { openJobs.delete(job.id); openJobs.add('__closed:' + job.id); }
+  });
+  const isOpen = openJobs.has(job.id) || (job.status === 'running' && !openJobs.has('__closed:' + job.id));
+  details.open = isOpen;
+
+  return {
+    card,
+    prompt: card.querySelector('.prompt-line'),
+    statusEl: card.querySelector('.status'),
+    cancelWrap: card.querySelector('.cancel-wrap'),
+    videoWrap: card.querySelector('.video-wrap'),
+    pre: card.querySelector('pre.log'),
+    details,
+    lastLog: null,
+    videoSet: false,
+  };
+}
+
+function updateCard(ref, job) {
+  ref.statusEl.className = 'status ' + job.status;
+  const queueSuffix = (job.status === 'queued' && job.queue_position)
+    ? ` (${job.queue_position}-я в очереди)` : '';
+  ref.statusEl.textContent = `${job.status}${queueSuffix} ${fmtElapsed(job)}`;
+
+  ref.cancelWrap.innerHTML = (job.status === 'running' || job.status === 'queued')
+    ? `<button class="cancel" data-cancel="${job.id}">Cancel</button>` : '';
+
+  if (job.mode === 'image') {
+    if (job.image_ready && !ref.videoSet) {
+      ref.videoWrap.innerHTML = `<img src="/api/jobs/${job.id}/image" alt="результат">`;
+      ref.videoSet = true; // src больше не трогаем — иначе картинка перезагружается на каждый poll
+    }
+  } else if (job.video_ready && !ref.videoSet) {
+    ref.videoWrap.innerHTML = `<video controls src="/api/jobs/${job.id}/video"></video>`;
+    ref.videoSet = true; // src больше не трогаем — иначе видео перезагружается на каждый poll
+  }
+
+  const newLog = job.log_tail || '';
+  if (newLog !== ref.lastLog) {
+    ref.lastLog = newLog;
+    const wasAtBottom = ref.pre.scrollTop + ref.pre.clientHeight >= ref.pre.scrollHeight - 24;
+    ref.pre.textContent = newLog;
+    if (wasAtBottom) ref.pre.scrollTop = ref.pre.scrollHeight; // трогаем скролл, только если юзер и так был внизу
+  }
+}
+
+async function refreshJobs() {
+  const jobs = await (await fetch('/api/jobs')).json();
+  const container = document.getElementById('jobs');
+  const seen = new Set();
+
+  for (const jSummary of jobs) {
+    const job = await (await fetch('/api/jobs/' + jSummary.id)).json();
+    seen.add(job.id);
+    let ref = cardRefs.get(job.id);
+    if (!ref) {
+      ref = buildCard(job);
+      cardRefs.set(job.id, ref);
+    }
+    updateCard(ref, job);
+  }
+
+  for (const [id, ref] of cardRefs) {
+    if (!seen.has(id)) { ref.card.remove(); cardRefs.delete(id); }
+  }
+
+  // Порядок трогаем ТОЛЬКО если он реально изменился (новая задача, задача
+  // пропала). appendChild на уже правильно стоящем узле — это move в DOM,
+  // и на нём Safari у видео на кадр показывает старое содержимое, а внешний
+  // скролл main дёргается вверх — то же семейство бага, что было с логом,
+  // просто теперь на всю страницу при каждом опросе (2 сек).
+  const desiredOrder = jobs.map(j => j.id);
+  const currentOrder = Array.from(container.children).map(c => c.dataset.jobId);
+  const orderChanged = currentOrder.length !== desiredOrder.length ||
+    currentOrder.some((id, i) => id !== desiredOrder[i]);
+  if (orderChanged) {
+    for (const id of desiredOrder) {
+      const ref = cardRefs.get(id);
+      if (ref) container.appendChild(ref.card);
+    }
+  }
+}
+
+setInterval(refreshJobs, 2000);
+refreshJobs();
+</script>
+</body>
+</html>

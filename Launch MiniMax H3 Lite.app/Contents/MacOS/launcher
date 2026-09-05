@@ -1,0 +1,4 @@
+#!/bin/bash
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+LOG="/Users/dmytrolukashov/MiniMaxH3/lite/server/launcher.log"
+exec "/Users/dmytrolukashov/MiniMaxH3/lite/run.sh" >> "$LOG" 2>&1
