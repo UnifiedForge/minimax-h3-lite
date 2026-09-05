@@ -18,6 +18,7 @@
 """
 import asyncio
 import base64
+import re
 import json
 import logging
 import os
@@ -190,28 +191,42 @@ def _job_dir(job_id: str) -> Path:
     return d
 
 
+_FOOTPRINT_UNIT_TO_KB = {"K": 1, "M": 1024, "G": 1024 * 1024, "T": 1024 * 1024 * 1024}
+_FOOTPRINT_PEAK_RE = re.compile(r"Physical footprint \(peak\):\s+([\d.]+)([KMGT])")
+
+
 async def _poll_peak_rss_kb(pid: int, stop: asyncio.Event) -> int:
-    """Каждую секунду смотрит RSS процесса h3 через ps, возвращает пик за всё
-    время его жизни. Это именно память самого движка (Metal/Accelerate
-    работают потоками в этом же процессе, не форкают детей) — то, что нужно
-    для RAM-таблицы, в отличие от resource.getrusage(RUSAGE_CHILDREN), который
-    даёт кумулятивный максимум по ВСЕМ когда-либо завершённым дочерним
-    процессам этого сервера, а не по конкретному job."""
+    """Каждые ~1.5с смотрит "Physical footprint (peak)" процесса h3 через
+    vmmap --summary — то же число, что показывает Activity Monitor и что
+    реально использует macOS для решений об OOM (jetsam). Раньше тут был
+    ps -o rss=, но на реальном прогоне (768x768/quality video) он занизил
+    пик на ~7ГБ против Activity Monitor (13.6 vs 20.98) — похоже, ps rss не
+    полностью учитывает Metal/GPU unified-memory footprint движка на Apple
+    Silicon, а vmmap footprint учитывает. vmmap сам трекает пик за всё время
+    жизни процесса на уровне ядра, поэтому просто берём "(peak)" из каждого
+    замера — max() тут просто подстраховка на случай сбоя парсинга разового
+    замера, а не замена кумулятивного трекинга ядра.
+
+    Название функции/поле телеметрии (peak_rss_mb) оставлены как есть, чтобы
+    не гонять ещё одну миграцию схемы на сервере телеметрии — по сути это
+    теперь Physical Footprint, а не classic RSS."""
     peak_kb = 0
     while not stop.is_set():
         try:
             p = await asyncio.create_subprocess_exec(
-                "ps", "-o", "rss=", "-p", str(pid),
+                "vmmap", "--summary", str(pid),
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
             )
             out, _ = await p.communicate()
-            val = int(out.decode().strip() or 0)
-            if val > peak_kb:
-                peak_kb = val
+            m = _FOOTPRINT_PEAK_RE.search(out.decode(errors="ignore"))
+            if m:
+                val_kb = int(float(m.group(1)) * _FOOTPRINT_UNIT_TO_KB[m.group(2)])
+                if val_kb > peak_kb:
+                    peak_kb = val_kb
         except Exception:
             pass
         try:
-            await asyncio.wait_for(stop.wait(), timeout=1.0)
+            await asyncio.wait_for(stop.wait(), timeout=1.5)
         except asyncio.TimeoutError:
             pass
     return peak_kb
