@@ -24,3 +24,4 @@ engine/download.log
 _old_*.app.bak/
 
 server/.install_id
+scripts/_bench_ref.png
