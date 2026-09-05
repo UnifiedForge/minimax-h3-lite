@@ -1,4 +1,8 @@
 #!/bin/bash
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-LOG="/Users/dmytrolukashov/MiniMaxH3/lite/server/launcher.log"
-exec "/Users/dmytrolukashov/MiniMaxH3/lite/run.sh" >> "$LOG" 2>&1
+# Бандл может лежать где угодно (в т.ч. свежий git clone в другой папке) —
+# вычисляем путь к своей же папке (на 3 уровня выше Contents/MacOS), а не
+# берём захардкоженный путь с машины разработчика.
+DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+LOG="$DIR/server/launcher.log"
+exec "$DIR/run.sh" >> "$LOG" 2>&1
