@@ -288,6 +288,9 @@ async def _run_h3(job_id: str, argv: list[str]):
                 pageouts_delta=pageouts_delta,
                 ref_image_count=job.get("ref_image_count", 0),
                 has_frame_anchor=job.get("has_frame_anchor", False),
+                layers=job.get("layers"),
+                steps=job.get("steps"),
+                reuse=job.get("reuse"),
             )
         )
 
@@ -418,6 +421,15 @@ def _build_argv(job_id: str, params: dict, first_frame: Optional[Path],
     return argv
 
 
+def _argv_value(argv: list[str], flag: str) -> Optional[str]:
+    """Достаёт значение опции вида --flag VALUE из уже собранного argv —
+    надёжнее, чем дублировать логику выбора preset/custom для телеметрии."""
+    try:
+        return argv[argv.index(flag) + 1]
+    except (ValueError, IndexError):
+        return None
+
+
 def _load_enhancer_system_prompt(preset: str) -> str:
     fname = ENHANCER_PRESETS.get(preset)
     if not fname:
@@ -519,6 +531,11 @@ async def generate(
                   frames=frames, preset=preset, steps=steps, layers=layers,
                   reuse=reuse, seed=seed, token_reduction=token_reduction, mode=mode)
     argv = _build_argv(job_id, params, first_frame_path, last_frame_path, ref_paths)
+    # реальные steps/layers/reuse берём из уже собранного argv, а не из params —
+    # там при preset != "custom" они всё ещё None (сырые form-данные с фронта)
+    argv_layers = _argv_value(argv, "--layers")
+    argv_steps = _argv_value(argv, "--steps")
+    argv_reuse = _argv_value(argv, "--reuse")
 
     jobs[job_id] = {
         "id": job_id,
@@ -531,6 +548,9 @@ async def generate(
         "resolution": f"{width}x{height}",
         "seconds": seconds,
         "frames": frames,
+        "layers": int(argv_layers) if argv_layers else None,
+        "steps": int(argv_steps) if argv_steps else None,
+        "reuse": int(argv_reuse) if argv_reuse else None,
         "ref_image_count": len(ref_paths),
         "has_frame_anchor": bool(first_frame_path or last_frame_path),
     }

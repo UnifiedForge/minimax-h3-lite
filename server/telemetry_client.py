@@ -142,6 +142,9 @@ def send_generation_event(
     pageouts_delta: int | None = None,
     ref_image_count: int = 0,
     has_frame_anchor: bool = False,
+    layers: int | None = None,
+    steps: int | None = None,
+    reuse: int | None = None,
 ) -> None:
     if not TELEMETRY_ENABLED or not TELEMETRY_URL:
         return
@@ -161,6 +164,9 @@ def send_generation_event(
         "pageouts_delta": pageouts_delta,
         "ref_image_count": ref_image_count,
         "has_frame_anchor": has_frame_anchor,
+        "layers": layers,
+        "steps": steps,
+        "reuse": reuse,
         "duration_sec": duration_sec,
         "success": success,
         "error_class": error_class,
