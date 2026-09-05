@@ -20,6 +20,8 @@
     </array>
     <key>LSUIElement</key>
     <true/>
+    <key>LSMultipleInstancesProhibited</key>
+    <false/>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>
