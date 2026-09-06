@@ -23,11 +23,11 @@ MODEL_DIR="$ENGINE_DIR/MiniMax-H3"
 _dialog() {
   # простой информационный диалог с одной кнопкой OK — блокирует до клика,
   # так что шаги идут строго по порядку и юзер видит что происходит
-  osascript -e "display dialog \"$1\" with title \"MiniMax H3 — первый запуск\" buttons {\"OK\"} default button \"OK\"" >/dev/null 2>&1
+  osascript -e "display dialog \"$1\" with title \"MiniMax H3 — First run\" buttons {\"OK\"} default button \"OK\"" >/dev/null 2>&1
 }
 
 _ask_token() {
-  osascript -e 'text returned of (display dialog "Вставь Hugging Face токен (hf_...). Он нужен, чтобы скачать веса модели — токен создаётся на странице Settings → Access Tokens (Read), которая сейчас откроется в браузере вместе со страницей модели, где нужно принять лицензию." with title "MiniMax H3 — Hugging Face токен" default answer "" with hidden answer)' 2>/dev/null
+  osascript -e 'text returned of (display dialog "Paste your Hugging Face token (hf_...). It'"'"'s needed to download the model weights — create it on the Settings -> Access Tokens (Read) page, which will open now in the browser together with the model page where you need to accept the license." with title "MiniMax H3 — Hugging Face token" default answer "" with hidden answer)' 2>/dev/null
 }
 
 # true (код возврата 0), если реально нужна первичная настройка (клон/сборка/
@@ -44,9 +44,9 @@ bootstrap_engine() {
 
   # 1. исходники h3.c (antirez/h3.c) — если их вообще нет
   if [ ! -d "$H3_SRC" ]; then
-    _dialog "Это первый запуск на этой машине — движок h3.c ещё не скачан. Сейчас склоню исходники (antirez/h3.c с GitHub) и соберу — минуту-другую. Прогресс виден в этом окне Terminal."
+    _dialog "This is the first run on this machine — the h3.c engine isn't downloaded yet. Cloning the source (antirez/h3.c from GitHub) and building it now — a minute or two. Progress is visible in this Terminal window."
     if ! git clone https://github.com/antirez/h3.c "$H3_SRC"; then
-      _dialog "Не получилось склонировать h3.c — проверь интернет и запусти ярлык ещё раз. (Нужен установленный git — он идёт вместе с Xcode Command Line Tools.)"
+      _dialog "Failed to clone h3.c — check your internet connection and run the launcher again. (Requires git, which comes with Xcode Command Line Tools.)"
       exit 1
     fi
   fi
@@ -54,13 +54,13 @@ bootstrap_engine() {
   # 2. сборка бинарника
   if [ ! -x "$H3_BIN" ]; then
     if ! xcode-select -p >/dev/null 2>&1; then
-      _dialog "Для сборки движка нужны Xcode Command Line Tools (компилятор). Сейчас откроется системный установщик — после того как он закончит, запусти этот ярлык ещё раз."
+      _dialog "Building the engine requires Xcode Command Line Tools (the compiler). The system installer will open now — once it finishes, run this launcher again."
       xcode-select --install
       exit 1
     fi
-    _dialog "Собираю движок (make -j8) — минуту-две, дальше без диалогов. Прогресс сборки виден в этом окне Terminal."
+    _dialog "Building the engine (make -j8) — a minute or two, no more dialogs after this. Build progress is visible in this Terminal window."
     if ! (cd "$H3_SRC" && make -j8); then
-      _dialog "Сборка h3.c не удалась. Подробности — в этом окне Terminal, или напиши разработчику."
+      _dialog "Building h3.c failed. Details are in this Terminal window — or reach out to the developer."
       exit 1
     fi
   fi
@@ -68,18 +68,18 @@ bootstrap_engine() {
   # 3. веса модели — обязательный минимум это FL2VA (~146GB), Ref2VA/transformer
   # (~64GB) тянется следом для режима с референс-картинками
   if [ ! -d "$MODEL_DIR/FL2VA" ]; then
-    _dialog "Нужны веса модели MiniMax H3 (суммарно ~210GB — да, это много, качать не быстро). Для этого нужен бесплатный аккаунт на Hugging Face: на странице модели, которая сейчас откроется, прими лицензию (Community License Agreement), а на странице токенов создай Read-токен. Дальше вставишь его в следующее окно."
+    _dialog "The MiniMax H3 model weights are needed (~210GB total — yes, that's a lot, and it won't be quick). This requires a free Hugging Face account: on the model page that will open now, accept the license (Community License Agreement), then create a Read token on the tokens page. You'll paste it into the next window."
     open "https://huggingface.co/MiniMaxAI/MiniMax-H3"
     open "https://huggingface.co/settings/tokens"
     TOKEN="$(_ask_token)"
     if [ -z "$TOKEN" ]; then
-      _dialog "Токен не введён — без него веса не скачать. Запусти ярлык ещё раз, когда он будет готов."
+      _dialog "No token entered — the weights can't be downloaded without one. Run the launcher again once you have it."
       exit 1
     fi
-    _dialog "Начинаю скачивание (~210GB — может занять часы, зависит от интернета). Прогресс виден прямо в этом окне Terminal (и пишется в engine/download.log). Когда закончится, сервер запустится сам — просто подожди, диалог появится ещё раз."
+    _dialog "Starting the download (~210GB — this can take hours depending on your internet). Progress is visible right in this Terminal window (and logged to engine/download.log). Once it finishes, the server will start on its own — just wait, another dialog will appear."
     (cd "$ENGINE_DIR" && HF_TOKEN="$TOKEN" python3 "$REPO_ROOT/scripts/download_weights.py" both) 2>&1 | tee -a "$ENGINE_DIR/download.log"
     if [ ! -d "$MODEL_DIR/FL2VA" ]; then
-      _dialog "Скачивание не завершилось успешно — подробности в engine/download.log. Проверь токен/интернет и попробуй снова."
+      _dialog "The download didn't finish successfully — see engine/download.log for details. Check your token/internet and try again."
       exit 1
     fi
     # text_encoder/video_vae/audio_vae в Ref2VA/ побайтово совпадают с FL2VA/ —
@@ -87,6 +87,6 @@ bootstrap_engine() {
     if [ -f "$REPO_ROOT/scripts/link_ref2va_shared.sh" ] && [ ! -e "$MODEL_DIR/Ref2VA/text_encoder" ]; then
       bash "$REPO_ROOT/scripts/link_ref2va_shared.sh" "$MODEL_DIR" >> "$ENGINE_DIR/download.log" 2>&1
     fi
-    _dialog "Готово! Веса на месте, сервер сейчас запустится."
+    _dialog "Done! The weights are in place, the server is starting now."
   fi
 }

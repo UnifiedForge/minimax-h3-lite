@@ -9,7 +9,7 @@ A native macOS GUI for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3)
 - Text-to-video and text-to-image generation with h3.c, through a simple web UI (opens in your browser, served locally).
 - Speed/quality presets (Draft / Balanced / Quality) plus a Custom mode for manual `steps` / `layers` / `reuse`.
 - Reference modes: first/last-frame anchoring, or up to 3 reference images.
-- A "Задачи" (Active) / "История" (History) view — history survives server and browser restarts: it's rebuilt from what's already in `outputs/` and `server/jobs/`, so nothing generated is lost between sessions.
+- An Active / History view — history survives server and browser restarts: it's rebuilt from what's already in `outputs/` and `server/jobs/`, so nothing generated is lost between sessions.
 - A one-click `.app` launcher — no terminal required for day-to-day use.
 
 ## Requirements

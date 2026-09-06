@@ -33,11 +33,16 @@ from pathlib import Path
 logging.getLogger("uvicorn.access").disabled = True
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from telemetry_client import send_generation_event, sample_pre_generation
+from telemetry_client import (
+    send_generation_event,
+    sample_pre_generation,
+    get_telemetry_enabled,
+    set_telemetry_enabled,
+)
 
 EDITION = "lite"  # используется только в телеметрии
 
@@ -255,7 +260,7 @@ def _restore_history_from_disk() -> None:
             jobs[job_dir.name] = job
             restored += 1
     if restored:
-        logging.info(f"история: восстановлено {restored} job(ов) с диска после рестарта")
+        logging.info(f"history: restored {restored} job(s) from disk after restart")
 
 
 _FOOTPRINT_UNIT_TO_KB = {"K": 1, "M": 1024, "G": 1024 * 1024, "T": 1024 * 1024 * 1024}
@@ -342,13 +347,13 @@ async def _run_h3(job_id: str, argv: list[str]):
                 await asyncio.to_thread(_extract_best_frame, job_id)
                 image_path = OUTPUTS_DIR / f"{job_id}.png"
                 with open(log_path, "ab") as logf:
-                    logf.write(f"h3-wrapper: выбран лучший кадр -> {image_path}\n".encode())
+                    logf.write(f"h3-wrapper: picked best frame -> {image_path}\n".encode())
             except Exception as e:
                 # не роняем job целиком — mp4-чанк всё равно готов, просто
                 # картинку вытащить не смогли (например нет opencv в venv)
                 job["image_error"] = str(e)
                 with open(log_path, "ab") as logf:
-                    logf.write(f"h3-wrapper: не удалось выбрать кадр из клипа: {e}\n".encode())
+                    logf.write(f"h3-wrapper: failed to pick a frame from the clip: {e}\n".encode())
 
     if job["status"] in ("done", "error"):
         # анонимная телеметрия (см. telemetry_client.py) — fire-and-forget,
@@ -436,19 +441,19 @@ def _extract_best_frame(job_id: str) -> None:
 def _build_argv(job_id: str, params: dict, first_frame: Optional[Path],
                  last_frame: Optional[Path], ref_images: list[Path]) -> list[str]:
     if not H3_BIN.exists():
-        raise HTTPException(400, f"h3 binary not found at {H3_BIN} — сначала собери его (make -j8)")
+        raise HTTPException(400, f"h3 binary not found at {H3_BIN} — build it first (make -j8)")
     if not H3_MODEL_DIR.exists():
-        raise HTTPException(400, f"model dir not found at {H3_MODEL_DIR} — сначала скачай веса")
+        raise HTTPException(400, f"model dir not found at {H3_MODEL_DIR} — download the weights first")
 
     if (first_frame or last_frame) and ref_images:
-        raise HTTPException(400, "first/last-frame anchors нельзя сочетать с ref-image референсами")
+        raise HTTPException(400, "first/last-frame anchors can't be combined with ref-image references")
     # Lite: identity-референс ограничен 3 фото (в Pro — до 9, максимум который тянет h3.c)
     if ref_images and len(ref_images) > 3:
-        raise HTTPException(400, "В Lite-версии референс-режим ограничен 3 картинками (Pro — до 9)")
+        raise HTTPException(400, "In the Lite edition, reference mode is limited to 3 images (Pro allows up to 9)")
 
     w, h = int(params["width"]), int(params["height"])
     if w % 32 or h % 32 or w < 32 or h < 32 or w * h > MAX_PIXELS:
-        raise HTTPException(400, "width/height должны быть кратны 32 и не превышать 768x1344 по площади")
+        raise HTTPException(400, "width/height must be multiples of 32 and not exceed 768x1344 in area")
 
     preset_name = params.get("preset", "balanced")
     if preset_name == "custom":
@@ -516,7 +521,7 @@ def _argv_value(argv: list[str], flag: str) -> Optional[str]:
 # но отдают 403 — на случай если кто-то раскомментит кнопку на фронте руками.
 @app.get("/api/enhance/presets")
 async def enhance_presets():
-    raise HTTPException(403, "Промпт-энхенсер доступен только в Pro-версии")
+    raise HTTPException(403, "Prompt enhancer is available only in the Pro edition")
 
 
 @app.post("/api/enhance")
@@ -525,7 +530,7 @@ async def enhance(
     preset: str = Form("naxdy"),
     image: Optional[UploadFile] = File(None),
 ):
-    raise HTTPException(403, "Промпт-энхенсер доступен только в Pro-версии")
+    raise HTTPException(403, "Prompt enhancer is available only in the Pro edition")
 
 
 @app.post("/api/generate")
@@ -663,6 +668,18 @@ async def job_image(job_id: str):
     if not path.exists():
         raise HTTPException(404, "image not ready")
     return FileResponse(path, media_type="image/png")
+
+
+@app.get("/api/settings/telemetry")
+async def get_telemetry_setting():
+    return {"enabled": get_telemetry_enabled()}
+
+
+@app.post("/api/settings/telemetry")
+async def set_telemetry_setting(payload: dict = Body(...)):
+    enabled = bool(payload.get("enabled", True))
+    set_telemetry_enabled(enabled)
+    return {"enabled": enabled}
 
 
 @app.get("/")

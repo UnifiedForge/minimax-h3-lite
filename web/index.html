@@ -86,24 +86,24 @@
 
 <aside>
   <div>
-    <h1>Тип генерации</h1>
+    <h1>Generation type</h1>
     <div class="tabs">
-      <div class="tab active" data-mode="video">Видео</div>
-      <div class="tab" data-mode="image">Картинка</div>
+      <div class="tab active" data-mode="video">Video</div>
+      <div class="tab" data-mode="image">Image</div>
     </div>
     <div class="hint" id="mode-hint" style="margin-top:6px;"></div>
   </div>
 
   <div>
-    <h1>Промпт</h1>
+    <h1>Prompt</h1>
     <div class="field"><textarea id="prompt" placeholder="Scene: ... Action: ... Camera: ... Look: ... Audio: ..."></textarea></div>
-    <div class="hint" style="margin-top:6px;">Промпт-энхенсер (авто-развёртывание промпта локальной LLM) — фича Pro.</div>
+    <div class="hint" style="margin-top:6px;">Prompt enhancer (auto-expands the prompt via a local LLM) — a Pro feature.</div>
   </div>
 
   <div>
-    <h1>Референсы</h1>
+    <h1>References</h1>
     <div class="tabs">
-      <div class="tab active" data-ref-mode="none">Нет</div>
+      <div class="tab active" data-ref-mode="none">None</div>
       <div class="tab" data-ref-mode="anchor">First/Last frame</div>
       <div class="tab" data-ref-mode="ref">Reference images</div>
     </div>
@@ -111,12 +111,12 @@
     <div id="ref-anchor" class="panel" style="display:none; margin-top:10px;">
       <div class="row">
         <div class="field">
-          <label>Первый кадр</label>
-          <div class="file-drop" data-input="first_frame">выбрать файл</div>
+          <label>First frame</label>
+          <div class="file-drop" data-input="first_frame">choose file</div>
         </div>
         <div class="field">
-          <label>Последний кадр</label>
-          <div class="file-drop" data-input="last_frame">выбрать файл</div>
+          <label>Last frame</label>
+          <div class="file-drop" data-input="last_frame">choose file</div>
         </div>
       </div>
       <input type="file" id="first_frame" accept="image/*" hidden>
@@ -124,54 +124,54 @@
     </div>
 
     <div id="ref-images" class="panel" style="display:none; margin-top:10px;">
-      <div class="file-drop" data-input="ref_images">добавить референс-картинки (до 3, порядок важен)</div>
+      <div class="file-drop" data-input="ref_images">add reference images (up to 3, order matters)</div>
       <input type="file" id="ref_images" accept="image/*" multiple hidden>
       <div id="ref-list" class="hint" style="margin-top:8px;"></div>
     </div>
   </div>
 
   <div>
-    <h1>Кадр</h1>
+    <h1>Frame</h1>
     <div class="row">
       <div class="field">
-        <label>Разрешение</label>
+        <label>Resolution</label>
         <select id="resolution">
-          <optgroup label="Вертикальное 9:16">
-            <option value="288x512" selected>288×512 — быстро</option>
-            <option value="480x864">480×864 — среднее</option>
-            <option value="768x1344">768×1344 — макс. качество</option>
+          <optgroup label="Vertical 9:16">
+            <option value="288x512" selected>288×512 — fast</option>
+            <option value="480x864">480×864 — medium</option>
+            <option value="768x1344">768×1344 — max quality</option>
           </optgroup>
-          <optgroup label="Горизонтальное 16:9">
-            <option value="512x288">512×288 — быстро</option>
-            <option value="864x480">864×480 — среднее</option>
-            <option value="1344x768">1344×768 — макс. качество</option>
+          <optgroup label="Horizontal 16:9">
+            <option value="512x288">512×288 — fast</option>
+            <option value="864x480">864×480 — medium</option>
+            <option value="1344x768">1344×768 — max quality</option>
           </optgroup>
-          <optgroup label="Квадрат 1:1">
-            <option value="512x512">512×512 — быстро</option>
-            <option value="768x768">768×768 — макс. качество</option>
+          <optgroup label="Square 1:1">
+            <option value="512x512">512×512 — fast</option>
+            <option value="768x768">768×768 — max quality</option>
           </optgroup>
           <optgroup label="4:3 / 3:4">
-            <option value="1024x768">1024×768 — горизонтальное</option>
-            <option value="768x1024">768×1024 — вертикальное</option>
+            <option value="1024x768">1024×768 — horizontal</option>
+            <option value="768x1024">768×1024 — vertical</option>
           </optgroup>
-          <optgroup label="Служебное">
-            <option value="256x256">256×256 — превью</option>
+          <optgroup label="Utility">
+            <option value="256x256">256×256 — preview</option>
           </optgroup>
         </select>
       </div>
       <div class="field" id="duration-field">
-        <label>Длительность, сек</label>
+        <label>Duration, sec</label>
         <input type="number" id="seconds" value="1" step="0.5" min="0.5">
       </div>
     </div>
   </div>
 
   <div>
-    <h1>Скорость / качество</h1>
+    <h1>Speed / quality</h1>
     <div class="tabs">
-      <div class="tab" data-preset="draft">Draft<br><span class="hint">4 шага</span></div>
-      <div class="tab active" data-preset="balanced">Balanced<br><span class="hint">20 шагов</span></div>
-      <div class="tab" data-preset="quality">Quality<br><span class="hint">50 шагов</span></div>
+      <div class="tab" data-preset="draft">Draft<br><span class="hint">4 steps</span></div>
+      <div class="tab active" data-preset="balanced">Balanced<br><span class="hint">20 steps</span></div>
+      <div class="tab" data-preset="quality">Quality<br><span class="hint">50 steps</span></div>
       <div class="tab" data-preset="custom">Custom</div>
     </div>
     <div id="custom-params" class="row" style="display:none; margin-top:10px;">
@@ -183,19 +183,27 @@
 
   <div class="row">
     <div class="field">
-      <label>Seed (пусто = 42 по умолчанию h3)</label>
+      <label>Seed (empty = h3 default 42)</label>
       <input type="number" id="seed" placeholder="42">
     </div>
   </div>
 
   <button class="primary" id="generate">Generate</button>
-  <div class="hint">Balanced ≈ 512² за секунды на M5 Max. Quality заметно дороже — используй для финального прохода, не для итераций.</div>
+  <div class="hint">Balanced ≈ 512² in seconds on M5 Max. Quality is noticeably pricier — use it for the final pass, not for iterating.</div>
+
+  <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:0;">
+      <input type="checkbox" id="telemetry-toggle" style="accent-color: var(--accent); width:15px; height:15px; margin:0;">
+      <span style="color: var(--text); font-size:13px;">Share anonymous usage stats</span>
+    </label>
+    <div class="hint" style="margin-top:6px;">Helps improve performance across hardware. No prompts, files, images, or personal info are ever sent.</div>
+  </div>
 </aside>
 
 <main>
   <div class="tabs" id="jobs-tabs" style="max-width: 280px;">
-    <div class="tab active" data-view="active">Задачи</div>
-    <div class="tab" data-view="history">История</div>
+    <div class="tab active" data-view="active">Active</div>
+    <div class="tab" data-view="history">History</div>
   </div>
   <div id="jobs-active" class="jobs-list"></div>
   <div id="jobs-history" class="jobs-list" style="display:none;"></div>
@@ -209,7 +217,7 @@ let selectedFirstFrame = null, selectedLastFrame = null, selectedRefImages = [];
 
 const MODE_HINTS = {
   video: "",
-  image: "h3.c не умеет генерить одну картинку напрямую — просит у движка минимальный клип (22 кадра, ~0.9 сек) и сам выбирает самый резкий кадр (тот же принцип, что best_quality в оригинальном TI2I-воркфлоу).",
+  image: "h3.c can't generate a single image directly — it asks the engine for the smallest possible clip (22 frames, ~0.9s) and picks the sharpest frame itself (the same principle as best_quality in the original TI2I workflow).",
 };
 document.querySelectorAll('[data-mode]').forEach(el => el.addEventListener('click', () => {
   document.querySelectorAll('[data-mode]').forEach(t => t.classList.remove('active'));
@@ -248,12 +256,12 @@ document.querySelectorAll('.file-drop').forEach(el => el.addEventListener('click
 
 document.getElementById('first_frame').addEventListener('change', e => {
   selectedFirstFrame = e.target.files[0] || null;
-  document.querySelector('[data-input=first_frame]').textContent = selectedFirstFrame ? selectedFirstFrame.name : 'выбрать файл';
+  document.querySelector('[data-input=first_frame]').textContent = selectedFirstFrame ? selectedFirstFrame.name : 'choose file';
   document.querySelector('[data-input=first_frame]').classList.toggle('filled', !!selectedFirstFrame);
 });
 document.getElementById('last_frame').addEventListener('change', e => {
   selectedLastFrame = e.target.files[0] || null;
-  document.querySelector('[data-input=last_frame]').textContent = selectedLastFrame ? selectedLastFrame.name : 'выбрать файл';
+  document.querySelector('[data-input=last_frame]').textContent = selectedLastFrame ? selectedLastFrame.name : 'choose file';
   document.querySelector('[data-input=last_frame]').classList.toggle('filled', !!selectedLastFrame);
 });
 document.getElementById('ref_images').addEventListener('change', e => {
@@ -308,8 +316,8 @@ function renderRefList() {
   const drop = document.querySelector('[data-input=ref_images]');
   drop.classList.toggle('filled', selectedRefImages.length > 0);
   drop.textContent = selectedRefImages.length >= 3
-    ? 'максимум 3 референса (в Pro — до 9)'
-    : 'добавить референс-картинки (до 3, порядок важен)';
+    ? 'maximum 3 references (Pro allows up to 9)'
+    : 'add reference images (up to 3, order matters)';
 }
 
 function activePreset() {
@@ -346,7 +354,7 @@ async function generate() {
     const res = await fetch('/api/generate', { method: 'POST', body: fd });
     if (!res.ok) {
       const err = await res.json().catch(()=>({detail: res.statusText}));
-      alert('Ошибка: ' + (err.detail || res.statusText));
+      alert('Error: ' + (err.detail || res.statusText));
       return;
     }
     await refreshJobs();
@@ -355,6 +363,18 @@ async function generate() {
   }
 }
 document.getElementById('generate').addEventListener('click', generate);
+
+const telemetryToggle = document.getElementById('telemetry-toggle');
+fetch('/api/settings/telemetry').then(r => r.json()).then(d => {
+  telemetryToggle.checked = d.enabled !== false;
+}).catch(() => {});
+telemetryToggle.addEventListener('change', () => {
+  fetch('/api/settings/telemetry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: telemetryToggle.checked }),
+  }).catch(() => {});
+});
 
 function formatHMS(totalSeconds) {
   const s = Math.floor(totalSeconds % 60);
@@ -411,7 +431,7 @@ function buildCard(job) {
     </div>
     <div class="video-wrap"></div>
     <details data-job-id="${job.id}">
-      <summary class="hint">лог</summary>
+      <summary class="hint">log</summary>
       <pre class="log"></pre>
     </details>
   `;
@@ -440,7 +460,7 @@ function buildCard(job) {
 function updateCard(ref, job) {
   ref.statusEl.className = 'status ' + job.status;
   const queueSuffix = (job.status === 'queued' && job.queue_position)
-    ? ` (${job.queue_position}-я в очереди)` : '';
+    ? ` (#${job.queue_position} in queue)` : '';
   ref.statusEl.textContent = `${job.status}${queueSuffix} ${fmtElapsed(job)}`;
 
   ref.cancelWrap.innerHTML = (job.status === 'running' || job.status === 'queued')
@@ -448,7 +468,7 @@ function updateCard(ref, job) {
 
   if (job.mode === 'image') {
     if (job.image_ready && !ref.videoSet) {
-      ref.videoWrap.innerHTML = `<img src="/api/jobs/${job.id}/image" alt="результат">`;
+      ref.videoWrap.innerHTML = `<img src="/api/jobs/${job.id}/image" alt="result">`;
       ref.videoSet = true; // src больше не трогаем — иначе картинка перезагружается на каждый poll
     }
   } else if (job.video_ready && !ref.videoSet) {

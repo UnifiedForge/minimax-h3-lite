@@ -11,7 +11,9 @@ reference-картинок/frame-анкоров, дельту Pageouts за вр
 больше — ни промпта, ни путей к файлам, ни изображений, ни email/имени.
 
 Отключается переменной окружения H3_TELEMETRY=0 (по умолчанию включено —
-можно сменить на opt-in, если решишь иначе).
+можно сменить на opt-in, если решишь иначе), а также живым тумблером в UI
+(Settings -> Share anonymous usage stats), который пишет .telemetry_toggle
+рядом (gitignored) и проверяется на каждой отправке, без рестарта сервера.
 
 Любая ошибка сети/сервера тут проглатывается — телеметрия никогда не должна
 уронить или задержать реальную генерацию.
@@ -34,6 +36,27 @@ TELEMETRY_KEY = os.environ.get("H3_TELEMETRY_KEY", _DEFAULT_TELEMETRY_KEY)
 APP_VERSION = os.environ.get("H3_APP_VERSION", "0.1")
 
 _INSTALL_ID_FILE = Path(__file__).parent / ".install_id"  # gitignored
+_TOGGLE_FILE = Path(__file__).parent / ".telemetry_toggle"  # gitignored, JSON {"enabled": bool}
+
+
+def get_telemetry_enabled() -> bool:
+    """Живое состояние тумблера из UI. Отсутствие файла = включено (значение
+    по умолчанию, совпадающее со старым H3_TELEMETRY=1). Читается заново на
+    каждый вызов send_generation_event — переключение в UI действует сразу,
+    без рестарта сервера."""
+    try:
+        if _TOGGLE_FILE.exists():
+            return bool(json.loads(_TOGGLE_FILE.read_text()).get("enabled", True))
+    except Exception:
+        pass
+    return True
+
+
+def set_telemetry_enabled(enabled: bool) -> None:
+    try:
+        _TOGGLE_FILE.write_text(json.dumps({"enabled": bool(enabled)}))
+    except Exception:
+        pass  # не роняем запрос из-за диска только для этойнастройки
 
 
 def _install_id() -> str:
@@ -146,7 +169,7 @@ def send_generation_event(
     steps: int | None = None,
     reuse: int | None = None,
 ) -> None:
-    if not TELEMETRY_ENABLED or not TELEMETRY_URL:
+    if not TELEMETRY_ENABLED or not TELEMETRY_URL or not get_telemetry_enabled():
         return
     payload = {
         "install_id": _install_id(),

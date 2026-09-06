@@ -41,7 +41,7 @@ source venv/bin/activate
 # venv может протухнуть, если Homebrew обновил/переустановил сам python3 —
 # тогда symlink'и внутри venv/bin ведут в никуда
 if ! python3 -c "" >/dev/null 2>&1; then
-  echo "venv битый (протухшие symlink'и на python3) — пересоздаю..."
+  echo "venv is broken (stale python3 symlinks) — recreating..."
   type deactivate >/dev/null 2>&1 && deactivate
   rm -rf venv
   python3 -m venv venv

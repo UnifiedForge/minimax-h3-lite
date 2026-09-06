@@ -24,4 +24,5 @@ engine/download.log
 _old_*.app.bak/
 
 server/.install_id
+server/.telemetry_toggle
 scripts/_bench_ref.png
