@@ -25,8 +25,6 @@ import os
 import signal
 import shlex
 import time
-import urllib.error
-import urllib.request
 import uuid
 from pathlib import Path
 
@@ -88,17 +86,6 @@ MAX_PIXELS = 768 * 1344
 # на 24fps — это быстрее любого настоящего видео), а лучший кадр из результата
 # выбираем сами — по резкости (variance of Laplacian), см. _extract_best_frame.
 IMAGE_MODE_FRAMES = 22
-
-# --- локальный промпт-энхенсер через LM Studio (OpenAI-совместимый API) ----
-LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:1234/v1")
-LLM_MODEL = os.environ.get("LLM_MODEL", "gemma-4-31b-it-heretic-i1_nd")
-
-PROMPTS_DIR = PROJECT_ROOT / "reference" / "prompts"
-ENHANCER_PRESETS = {
-    "naxdy": "MiniMax H3 by Naxdy.txt",
-    "character_sheet": "Character Sheet 3x2 (MMH3).txt",
-    "ti2i_storyboard": "MiniMax H3 - TI2I - Storyboard by Pavel.txt",
-}
 
 app = FastAPI(title="MiniMax H3 (h3.c) — minimal wrapper")
 
@@ -443,54 +430,6 @@ def _argv_value(argv: list[str], flag: str) -> Optional[str]:
         return argv[argv.index(flag) + 1]
     except (ValueError, IndexError):
         return None
-
-
-def _load_enhancer_system_prompt(preset: str) -> str:
-    fname = ENHANCER_PRESETS.get(preset)
-    if not fname:
-        raise HTTPException(400, f"неизвестный пресет энхенсера: {preset}")
-    path = PROMPTS_DIR / fname
-    if not path.exists():
-        raise HTTPException(400, f"файл системного промпта не найден: {path}")
-    return path.read_text(encoding="utf-8")
-
-
-def _call_llm(system_prompt: str, user_text: str, image_b64: Optional[str] = None) -> str:
-    """Синхронный блокирующий вызов LM Studio — гоняется через
-    asyncio.to_thread, чтобы не морозить event loop сервера на время
-    ответа модели (может занимать десятки секунд на 31B)."""
-    content: list = []
-    if image_b64:
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}})
-    content.append({"type": "text", "text": user_text})
-
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": content},
-        ],
-        "temperature": 0.8,
-        # не режем нормальную длину ответа (у Naxdy-промпта она сама по себе
-        # немаленькая, за 1000+ токенов) — это просто страховка от зацикливания
-        # модели (частый failure mode локальных LLM), а не лимит на контент.
-        "max_tokens": 3000,
-    }
-    req = urllib.request.Request(
-        LLM_BASE_URL.rstrip("/") + "/chat/completions",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            data = json.loads(resp.read().decode())
-    except urllib.error.URLError as e:
-        raise HTTPException(502, f"не достучался до LLM-сервера ({LLM_BASE_URL}): {e}")
-    try:
-        return data["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError):
-        raise HTTPException(502, f"неожиданный ответ LLM-сервера: {data}")
 
 
 # Промпт-энхенсер — Pro-эксклюзив (решено 2026-09-05). Эндпоинты оставлены,
