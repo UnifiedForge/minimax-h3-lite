@@ -14,7 +14,8 @@
 # так работает для чистого git clone. H3_ENGINE_DIR — локальный оверрайд
 # (см. .h3env, не в гите) для машины разработчика, где engine/ общий на
 # несколько копий проекта.
-ENGINE_DIR="${H3_ENGINE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/engine}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENGINE_DIR="${H3_ENGINE_DIR:-$REPO_ROOT/engine}"
 H3_SRC="$ENGINE_DIR/h3c-src"
 H3_BIN="$H3_SRC/h3"
 MODEL_DIR="$ENGINE_DIR/MiniMax-H3"
@@ -76,15 +77,15 @@ bootstrap_engine() {
       exit 1
     fi
     _dialog "Начинаю скачивание (~210GB — может занять часы, зависит от интернета). Прогресс виден прямо в этом окне Terminal (и пишется в engine/download.log). Когда закончится, сервер запустится сам — просто подожди, диалог появится ещё раз."
-    (cd "$ENGINE_DIR" && HF_TOKEN="$TOKEN" python3 download_weights.py both) 2>&1 | tee -a "$ENGINE_DIR/download.log"
+    (cd "$ENGINE_DIR" && HF_TOKEN="$TOKEN" python3 "$REPO_ROOT/scripts/download_weights.py" both) 2>&1 | tee -a "$ENGINE_DIR/download.log"
     if [ ! -d "$MODEL_DIR/FL2VA" ]; then
       _dialog "Скачивание не завершилось успешно — подробности в engine/download.log. Проверь токен/интернет и попробуй снова."
       exit 1
     fi
     # text_encoder/video_vae/audio_vae в Ref2VA/ побайтово совпадают с FL2VA/ —
     # симлинкуем вместо повторного скачивания (см. link_ref2va_shared.sh)
-    if [ -f "$ENGINE_DIR/link_ref2va_shared.sh" ] && [ ! -e "$MODEL_DIR/Ref2VA/text_encoder" ]; then
-      (cd "$ENGINE_DIR" && bash link_ref2va_shared.sh) >> "$ENGINE_DIR/download.log" 2>&1
+    if [ -f "$REPO_ROOT/scripts/link_ref2va_shared.sh" ] && [ ! -e "$MODEL_DIR/Ref2VA/text_encoder" ]; then
+      bash "$REPO_ROOT/scripts/link_ref2va_shared.sh" "$MODEL_DIR" >> "$ENGINE_DIR/download.log" 2>&1
     fi
     _dialog "Готово! Веса на месте, сервер сейчас запустится."
   fi

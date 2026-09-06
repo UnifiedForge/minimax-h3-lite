@@ -25,6 +25,8 @@ A native macOS GUI for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3)
 1. `git clone` this repository (or download it as a ZIP and unzip it).
 2. Double-click `Launch MiniMax H3 Lite.app`.
 
+The app isn't code-signed, so macOS will refuse to open it the first time ("Apple could not verify..."). Right-click (or Control-click) it and choose **Open** instead of double-clicking — that shows an "Open Anyway" option double-click doesn't. You only need to do this once.
+
 That's it for day-to-day use. **First run is different** — see below.
 
 ### First run
