@@ -127,6 +127,7 @@ async def _queue_worker():
 
 @app.on_event("startup")
 async def _on_startup():
+    _restore_history_from_disk()
     asyncio.create_task(_queue_worker())
 
 
@@ -176,6 +177,85 @@ def _job_dir(job_id: str) -> Path:
     d = JOBS_DIR / job_id
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _reconstruct_job_from_disk(job_id: str) -> Optional[dict]:
+    """После рестарта servera jobs (в памяти) пустой, но сами файлы —
+    log.txt и готовый mp4/png — остаются на диске. _run_h3 пишет первой
+    строкой log.txt полный argv, которым реально запускали h3 (см. запись
+    " ".join(shlex.quote(a) ...) в начале функции) — оттуда и вытаскиваем
+    prompt/resolution/layers/steps/reuse через уже существующий _argv_value,
+    вместо того чтобы городить отдельный format метаданных job'a.
+    Возвращает None, если по этому job_id даже лога нет (совсем мусорная
+    пустая папка) — такое не должно попадать в историю."""
+    log_path = JOBS_DIR / job_id / "log.txt"
+    if not log_path.exists():
+        return None
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            first_line = f.readline().strip()
+        argv = shlex.split(first_line) if first_line else []
+    except Exception:
+        argv = []
+
+    has_image = (OUTPUTS_DIR / f"{job_id}.png").exists()
+    has_video = (OUTPUTS_DIR / f"{job_id}.mp4").exists()
+    mode = "image" if has_image else "video"
+    status = "done" if (has_image or has_video) else "error"
+
+    try:
+        mtime = log_path.stat().st_mtime
+    except OSError:
+        mtime = time.time()
+
+    width = _argv_value(argv, "--width")
+    height = _argv_value(argv, "--height")
+    frames = _argv_value(argv, "--frames")
+    seconds = _argv_value(argv, "--seconds")
+    layers = _argv_value(argv, "--layers")
+    steps = _argv_value(argv, "--steps")
+    reuse = _argv_value(argv, "--reuse")
+
+    return {
+        "id": job_id,
+        "status": status,
+        "created_at": mtime,
+        "started_at": None,  # неизвестно после рестарта — карточка просто не покажет elapsed
+        "finished_at": mtime,
+        "returncode": 0 if status == "done" else 1,
+        "prompt": _argv_value(argv, "-p") or "",
+        "argv": argv,
+        "mode": mode,
+        "preset": "-",  # имя пресета не сохраняется в argv, только реальные steps/layers/reuse
+        "resolution": f"{width}x{height}" if width and height else "",
+        "seconds": float(seconds) if seconds else None,
+        "frames": int(frames) if frames else None,
+        "layers": int(layers) if layers else None,
+        "steps": int(steps) if steps else None,
+        "reuse": int(reuse) if reuse else None,
+        "ref_image_count": argv.count("--ref-image"),
+        "has_frame_anchor": ("--first-frame" in argv) or ("--last-frame" in argv),
+        "log_path": str(log_path),
+        "restored": True,
+    }
+
+
+def _restore_history_from_disk() -> None:
+    """Вкладка "История" должна показывать всё, что реально лежит в
+    outputs/, даже после перезапуска сервера/клиента — не только то, что
+    случилось в текущем процессе. Сканируется один раз при старте."""
+    if not JOBS_DIR.exists():
+        return
+    restored = 0
+    for job_dir in JOBS_DIR.iterdir():
+        if not job_dir.is_dir() or job_dir.name in jobs:
+            continue
+        job = _reconstruct_job_from_disk(job_dir.name)
+        if job:
+            jobs[job_dir.name] = job
+            restored += 1
+    if restored:
+        logging.info(f"история: восстановлено {restored} job(ов) с диска после рестарта")
 
 
 _FOOTPRINT_UNIT_TO_KB = {"K": 1, "M": 1024, "G": 1024 * 1024, "T": 1024 * 1024 * 1024}
