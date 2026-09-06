@@ -1,6 +1,6 @@
 MiniMax H3 Lite — Source-Available License
 
-Copyright (c) 2026 Dmytro Lukashov. All rights reserved.
+Copyright (c) 2026 UnifiedForge. All rights reserved.
 
 This repository's source code ("the Software") is made publicly viewable
 under the following terms.
