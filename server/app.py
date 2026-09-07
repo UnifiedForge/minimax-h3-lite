@@ -338,6 +338,12 @@ async def _run_h3(job_id: str, argv: list[str]):
     job["finished_at"] = time.time()
     job["returncode"] = returncode
     duration_sec = job["finished_at"] - job["started_at"]
+    # same numbers that go into telemetry below, also kept on the job itself so
+    # /api/jobs/{id} exposes them without needing the remote telemetry server
+    # (used by ram_tier_test.py and any other local diagnostics).
+    job["peak_rss_mb"] = (peak_rss_kb / 1024) if peak_rss_kb else None
+    job["free_ram_gb_start"] = mem_before.get("free_ram_gb")
+    job["pageouts_delta"] = pageouts_delta
     if job["status"] == "cancelled":
         pass  # уже помечено через /cancel — не перетираем на "error" из-за SIGTERM
     else:

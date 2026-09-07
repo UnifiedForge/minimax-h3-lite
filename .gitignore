@@ -26,3 +26,4 @@ _old_*.app.bak/
 server/.install_id
 server/.telemetry_toggle
 scripts/_bench_ref.png
+scripts/ram_tier_results_*.json
