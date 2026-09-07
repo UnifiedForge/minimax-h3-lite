@@ -324,10 +324,30 @@ function activePreset() {
   return document.querySelector('[data-preset].active').dataset.preset;
 }
 
+function formatApiError(err, fallback) {
+  if (typeof err.detail === 'string') return err.detail;
+  if (Array.isArray(err.detail)) {
+    return err.detail.map(d => {
+      if (d && d.msg) {
+        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : 'field';
+        return `${field}: ${d.msg}`;
+      }
+      return JSON.stringify(d);
+    }).join('; ');
+  }
+  if (err.detail) return JSON.stringify(err.detail);
+  return fallback;
+}
+
 async function generate() {
+  const promptValue = document.getElementById('prompt').value.trim();
+  if (!promptValue) {
+    alert('Please enter a prompt before generating.');
+    return;
+  }
   const [w, h] = document.getElementById('resolution').value.split('x').map(Number);
   const fd = new FormData();
-  fd.append('prompt', document.getElementById('prompt').value);
+  fd.append('prompt', promptValue);
   fd.append('width', w);
   fd.append('height', h);
   fd.append('mode', genMode);
@@ -354,7 +374,7 @@ async function generate() {
     const res = await fetch('/api/generate', { method: 'POST', body: fd });
     if (!res.ok) {
       const err = await res.json().catch(()=>({detail: res.statusText}));
-      alert('Error: ' + (err.detail || res.statusText));
+      alert('Error: ' + formatApiError(err, res.statusText));
       return;
     }
     await refreshJobs();
