@@ -8,7 +8,7 @@
   :root {
     --bg: #0f1115; --panel: #171a21; --border: #2a2e38; --text: #e8e9ec;
     --muted: #8b909c; --accent: #7c9eff; --accent-hover: #9db4ff;
-    --danger: #ff6b6b; --ok: #4ecb85;
+    --danger: #ff6b6b; --ok: #4ecb85; --warn: #e0a439;
   }
   * { box-sizing: border-box; }
   body {
@@ -190,6 +190,7 @@
 
   <button class="primary" id="generate">Generate</button>
   <div class="hint">Balanced ≈ 512² in seconds on M5 Max. Quality is noticeably pricier — use it for the final pass, not for iterating.</div>
+  <div id="ram-warning" style="display:none; margin-top:8px; padding:8px 10px; border:1px solid var(--warn); border-radius:6px; color:var(--warn); font-size:12px;"></div>
 
   <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:0;">
@@ -240,7 +241,10 @@ document.querySelectorAll('[data-preset]').forEach(el => el.addEventListener('cl
   document.querySelectorAll('[data-preset]').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('custom-params').style.display = el.dataset.preset === 'custom' ? 'flex' : 'none';
+  updateRamWarning();
 }));
+document.getElementById('resolution').addEventListener('change', updateRamWarning);
+document.getElementById('layers').addEventListener('input', updateRamWarning);
 
 document.querySelectorAll('#jobs-tabs [data-view]').forEach(el => el.addEventListener('click', () => {
   document.querySelectorAll('#jobs-tabs [data-view]').forEach(t => t.classList.remove('active'));
@@ -323,6 +327,44 @@ function renderRefList() {
 function activePreset() {
   return document.querySelector('[data-preset].active').dataset.preset;
 }
+
+// Soft, non-blocking heads-up - not a hard limit, nothing here changes what
+// gets sent to /api/generate. Based on scripts/ram_tier_test.py findings
+// (see Claude outputs/ram_tier_findings.md): the only real slowdown CLIFF
+// found (not gradual, a ~3x jump) was max canvas + high layers with little
+// free RAM. PRESET_LAYERS must stay in sync with PRESETS in server/app.py.
+const PRESET_LAYERS = { draft: 50, balanced: 45, quality: 50 };
+let systemStatus = null;
+
+function currentLayers() {
+  if (activePreset() === 'custom') {
+    return parseInt(document.getElementById('layers').value, 10) || 0;
+  }
+  return PRESET_LAYERS[activePreset()] || 0;
+}
+
+function updateRamWarning() {
+  const el = document.getElementById('ram-warning');
+  if (!el || !systemStatus || systemStatus.free_ram_gb == null) { if (el) el.style.display = 'none'; return; }
+  const [w, h] = document.getElementById('resolution').value.split('x').map(Number);
+  const heavy = (w * h) >= systemStatus.max_pixels && currentLayers() >= systemStatus.low_ram_warning_min_layers;
+  const lowRam = systemStatus.free_ram_gb < systemStatus.low_ram_warning_free_gb;
+  if (heavy && lowRam) {
+    el.textContent = `Heads up: max resolution + high layers can take noticeably longer right now (~${systemStatus.free_ram_gb.toFixed(0)}GB free). Not a hard limit - generation will still run, just expect a longer wait.`;
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function refreshSystemStatus() {
+  try {
+    systemStatus = await (await fetch('/api/system-status')).json();
+    updateRamWarning();
+  } catch (e) {}
+}
+refreshSystemStatus();
+setInterval(refreshSystemStatus, 8000);
 
 function formatApiError(err, fallback) {
   if (typeof err.detail === 'string') return err.detail;

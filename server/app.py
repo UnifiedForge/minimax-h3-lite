@@ -78,6 +78,24 @@ PRESETS = {
 # сама модель отвергнет некорректную комбинацию с понятной ошибкой в логе.
 MAX_PIXELS = 768 * 1344
 
+# --- предупреждение о нехватке RAM для тяжёлых генераций -----------------
+# Источник: scripts/ram_tier_test.py, ручной прогон на M5 Max 128GB с
+# эмулированным дефицитом памяти (mlock-баллласт) - см.
+# Claude outputs/ram_tier_findings.md. Единственный найденный реальный
+# обрыв (не плавное замедление, а скачок в ~3x) - связка максимального
+# канваса (MAX_PIXELS) с layers=50 при малом свободном RAM: 118с на ~24GB
+# свободных против 367с на ~16-19GB. Все остальные связки на тех же тирах
+# деградировали плавно (1.3-1.5x), без обрыва. LOW_RAM_WARNING_FREE_GB
+# выставлен с запасом относительно точки обрыва (граница между 24 и
+# 16-19GB) - это ПРЕДУПРЕЖДЕНИЕ, не блокировка: генерация не отменяется,
+# параметры не подрезаются, пользователь просто видит, что именно на этой
+# связке (макс. разрешение + макс. layers) при текущем свободном RAM
+# может быть заметно медленнее обычного. Порог получен на одной машине с
+# эмулированным дефицитом, а не на россыпи реальных Mac - калибровка
+# уточнится, когда накопится телеметрия с разных машин.
+LOW_RAM_WARNING_FREE_GB = 24.0
+LOW_RAM_WARNING_MIN_LAYERS = 45
+
 # --- image-mode (одна картинка вместо видео) -------------------------------
 # У h3.c нет нативного режима "просто одна картинка" — минимальная единица
 # генерации это один декодерный чанк видео-VAE, который h3_align_frame_count()
@@ -674,6 +692,21 @@ async def job_image(job_id: str):
     if not path.exists():
         raise HTTPException(404, "image not ready")
     return FileResponse(path, media_type="image/png")
+
+
+@app.get("/api/system-status")
+async def system_status():
+    """Лёгкий эндпоинт для превентивного UI-предупреждения (до старта
+    генерации, не путать с mem_before/mem_after внутри _run_h3) -
+    фронт дёргает его периодически и сверяет текущий свободный RAM с
+    выбранными в форме параметрами. См. LOW_RAM_WARNING_FREE_GB выше."""
+    mem = await asyncio.to_thread(sample_pre_generation)
+    return {
+        "free_ram_gb": mem.get("free_ram_gb"),
+        "max_pixels": MAX_PIXELS,
+        "low_ram_warning_free_gb": LOW_RAM_WARNING_FREE_GB,
+        "low_ram_warning_min_layers": LOW_RAM_WARNING_MIN_LAYERS,
+    }
 
 
 @app.get("/api/settings/telemetry")
