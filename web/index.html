@@ -435,7 +435,13 @@ document.querySelector('main').addEventListener('click', async (e) => {
 // ВАЖНО: карточки создаются один раз и потом только точечно обновляются —
 // полный innerHTML-снос каждые 2 сек ломал скролл страницы, скролл лога и
 // перезапускал загрузку <video> (отсюда крутилка и "растянутое" видео).
-const cardRefs = new Map();
+// Отдельный Map на каждую вкладку: задача текущей сессии, которая уже
+// завершилась, должна одновременно остаться в "Активные" и появиться в
+// "История" — то есть быть карточкой в ОБОИХ контейнерах сразу, а не "перелетать"
+// между ними (перенос DOM-узла appendChild'ом такое не позволяет — узел
+// может быть только в одном месте).
+const activeRefs = new Map();
+const historyRefs = new Map();
 
 function buildCard(job) {
   const card = document.createElement('div');
@@ -505,7 +511,7 @@ function updateCard(ref, job) {
   }
 }
 
-function reorderInto(container, ids) {
+function reorderInto(container, refs, ids) {
   // Порядок трогаем ТОЛЬКО если он реально изменился (новая задача, задача
   // пропала, задача перешла между "Задачи"/"История"). appendChild на уже
   // правильно стоящем узле — это move в DOM, и на нём Safari у видео на
@@ -519,7 +525,7 @@ function reorderInto(container, ids) {
     currentOrder.some((id, i) => id !== ids[i]);
   if (orderChanged) {
     for (const id of ids) {
-      const ref = cardRefs.get(id);
+      const ref = refs.get(id);
       if (ref) container.appendChild(ref.card);
     }
   }
@@ -527,31 +533,43 @@ function reorderInto(container, ids) {
 
 const ACTIVE_STATUSES = new Set(['queued', 'running']);
 
-async function refreshJobs() {
-  const jobs = await (await fetch('/api/jobs')).json();
+function syncList(container, refs, jobList) {
   const seen = new Set();
-
-  for (const jSummary of jobs) {
-    const job = await (await fetch('/api/jobs/' + jSummary.id)).json();
+  for (const job of jobList) {
     seen.add(job.id);
-    let ref = cardRefs.get(job.id);
+    let ref = refs.get(job.id);
     if (!ref) {
       ref = buildCard(job);
-      cardRefs.set(job.id, ref);
+      refs.set(job.id, ref);
     }
     updateCard(ref, job);
   }
+  for (const [id, ref] of refs) {
+    if (!seen.has(id)) { ref.card.remove(); refs.delete(id); }
+  }
+  reorderInto(container, refs, jobList.map(j => j.id));
+}
 
-  for (const [id, ref] of cardRefs) {
-    if (!seen.has(id)) { ref.card.remove(); cardRefs.delete(id); }
+async function refreshJobs() {
+  const jobs = await (await fetch('/api/jobs')).json();
+  const fullJobs = [];
+  for (const jSummary of jobs) {
+    fullJobs.push(await (await fetch('/api/jobs/' + jSummary.id)).json());
   }
 
-  // restored=true (из _restore_history_from_disk на сервере после рестарта)
-  // никогда не бывает queued/running — они и так уедут в "Историю" по статусу.
-  const activeIds = jobs.filter(j => ACTIVE_STATUSES.has(j.status)).map(j => j.id);
-  const historyIds = jobs.filter(j => !ACTIVE_STATUSES.has(j.status)).map(j => j.id);
-  reorderInto(document.getElementById('jobs-active'), activeIds);
-  reorderInto(document.getElementById('jobs-history'), historyIds);
+  // "Активные": queued/running — и любая задача текущей сессии
+  // сервера (restored не проставлен — job создан через /api/generate в этом
+  // запуске, а не восстановлен с диска при старте), даже уже завершённая.
+  // Только рестарт сервера "убирает" её с этой вкладки.
+  // "История": как и раньше — всё не queued/running, включая restored=true (то, что реально
+  // лежит в outputs/ с предыдущих запусков) — эта вкладка не меняется, задача
+  // текущей сессии просто ДОПОЛНИТЕЛЬНО появляется тут же, когда завершится,
+  // как и до этого фикса.
+  const activeJobs = fullJobs.filter(j => ACTIVE_STATUSES.has(j.status) || !j.restored);
+  const historyJobs = fullJobs.filter(j => !ACTIVE_STATUSES.has(j.status));
+
+  syncList(document.getElementById('jobs-active'), activeRefs, activeJobs);
+  syncList(document.getElementById('jobs-history'), historyRefs, historyJobs);
 }
 
 setInterval(refreshJobs, 2000);
