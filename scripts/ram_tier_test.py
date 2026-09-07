@@ -73,9 +73,18 @@ MIN_FREE_GB = 6.0  # never target below this - leaving less than this free
 CHUNK_GB = 4.0      # wire in chunks so a partial failure is visible/bounded
                     # instead of one giant mlock() either fully succeeding or
                     # (as observed) failing almost completely with ~0 wired.
-TOLERANCE_GB = 3.0  # how far actual free-after-ballast may drift from the
-                    # target before the run is considered not meaningful
-                    # and aborted before any generations run.
+TOLERANCE_GB = 8.0  # how far actual free-after-ballast may drift from the
+                    # target before the run is considered not meaningful and
+                    # aborted before any generations run. Loosened from an
+                    # initial 3.0 after a real run: mlock() fully succeeded
+                    # (wired 100% of the requested amount) but vm_stat's
+                    # free+inactive figure still landed ~5GB above target -
+                    # macOS reclaims/settles inactive/purgeable pages from
+                    # OTHER processes for a bit after a big wiring event, so
+                    # the post-wire reading has real noise, not just outright
+                    # wiring failure. 8GB still catches genuinely broken runs
+                    # (the original bug produced 50-80GB+ deviations) without
+                    # aborting on normal settling noise.
 OUT_DIR = Path(__file__).parent
 
 # Image mode = one 22-frame chunk, cheap and fast - the right tool for a
@@ -220,10 +229,18 @@ def main():
 
     print("Wiring memory (mlock, in chunks)...", flush=True)
     libc, buf, carr, addr, wired_bytes = wire_ballast(int(hold_gb * 1024 ** 3))
-    time.sleep(1.0)
+    # give the kernel a moment to settle after a large wiring event before
+    # trusting vm_stat's free+inactive figure - two samples a couple
+    # seconds apart, using the later (more settled) one.
+    time.sleep(2.0)
+    free_sample_a = free_ram_gb()
+    time.sleep(2.0)
     actual_free = free_ram_gb()
     drift = actual_free - target_gb
-    print(f"Free after ballast: {actual_free:.1f}GB (target ~{target_gb:.0f}GB, drift {drift:+.1f}GB)")
+    print(
+        f"Free after ballast: {actual_free:.1f}GB (target ~{target_gb:.0f}GB, "
+        f"drift {drift:+.1f}GB; settling: {free_sample_a:.1f}GB -> {actual_free:.1f}GB)"
+    )
 
     if abs(drift) > TOLERANCE_GB:
         print(
