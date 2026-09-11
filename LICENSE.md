@@ -32,7 +32,11 @@ under the following terms.
    This repository does not bundle the h3.c engine (github.com/antirez/h3.c)
    or any model weights — these are downloaded separately by the setup
    script directly from their original sources and remain under their own
-   respective licenses.
+   respective licenses. In particular, the MiniMax H3 weights are subject
+   to the MiniMax H3 Community License Agreement
+   (https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/LICENSE),
+   including territorial restrictions — see the main README for details.
+   You are responsible for your own compliance with that license.
 
 This is a plain-language license, not a legal document drafted by a
 lawyer. If you need a legally binding license for a specific situation

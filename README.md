@@ -48,13 +48,26 @@ This is the free, source-available edition. A couple of things are intentionally
 
 Everything else — presets, both generation modes, the first/last-frame anchor mode, history — is the same engine and the same UI.
 
+## About the model license
+
+MiniMax H3's weights are distributed separately under the
+[MiniMax H3 Community License Agreement](https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/LICENSE),
+not by this repository. That license currently excludes use within the
+US, EU, UK, and South Korea without separate authorization from MiniMax.
+This tool does not host or distribute the weights — you download them
+yourself, in your own name, and accept MiniMax's license directly during
+the first-run setup. It is your responsibility to confirm you're
+permitted to do so under that license in your jurisdiction.
+
+This project is not affiliated with Apple, MiniMax, or antirez.
+
 ## Troubleshooting
 
 `RUN.md` has more detail on running from the terminal directly and on recovering a stuck generation (leftover `h3` process still holding the GPU after a crash or force-quit).
 
 ## License
 
-Source-available — see [`LICENSE.md`](./LICENSE.md). In short: you can view, run, and modify your own copy for personal use; you may not redistribute, sell, or resell it. The model weights and the `h3.c` engine are not bundled here and remain under their own respective licenses (downloaded separately by the setup step above).
+Source-available — see [`LICENSE.md`](./LICENSE.md). In short: you can view, run, and modify your own copy for personal use; you may not redistribute, sell, or resell it. The model weights and the `h3.c` engine are not bundled here and remain under their own respective licenses (downloaded separately by the setup step above). See "About the model license" above for details on MiniMax H3's usage restrictions.
 
 ## Credits
 
