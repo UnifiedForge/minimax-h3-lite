@@ -96,6 +96,54 @@ MAX_PIXELS = 768 * 1344
 LOW_RAM_WARNING_FREE_GB = 24.0
 LOW_RAM_WARNING_MIN_LAYERS = 45
 
+# Memory mode "Normal / Low-memory SSD / Auto" (2026-10-13). Peak-memory
+# estimate fitted to an overnight benchmark of 44 runs on M5 Max (peak memory
+# footprint from /usr/bin/time -l): mpxs = frame megapixels x seconds.
+# Normal: ~20 GB up to ~3 Mpx*s, then +1.27 GB per Mpx*s. --ssd-streaming
+# (DiT weights streamed from SSD, two blocks resident): ~10.5 GB up to
+# ~6 Mpx*s, then +1.25 GB. +15% margin. SSD is 1.05-1.5x slower.
+MEMORY_OS_RESERVE_GB = 8.0
+
+
+def _estimate_peak_gb(width: int, height: int, frames: int) -> dict:
+    mpxs = width * height / 1e6 * max(frames, 1) / 24.0
+    normal = 20.0 + 1.27 * max(0.0, mpxs - 3.0)
+    ssd = 10.5 + 1.25 * max(0.0, mpxs - 6.0)
+    return {"normal": round(normal * 1.15, 1), "ssd": round(ssd * 1.15, 1)}
+
+
+_TOTAL_RAM_GB: Optional[float] = None
+
+
+def _total_ram_gb() -> Optional[float]:
+    global _TOTAL_RAM_GB
+    if _TOTAL_RAM_GB is None:
+        try:
+            import subprocess
+            out = subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, timeout=5).stdout
+            _TOTAL_RAM_GB = int(out.strip()) / 1073741824
+        except Exception:
+            return None
+    return _TOTAL_RAM_GB
+
+
+def _choose_memory_mode(requested: str, width: int, height: int, frames: int) -> tuple:
+    """-> (mode "normal"|"ssd", label shown on the job card)."""
+    est = _estimate_peak_gb(width, height, frames)
+    if requested == "ssd":
+        return "ssd", "💾 SSD"
+    if requested == "normal":
+        return "normal", ""
+    total = _total_ram_gb()
+    if total is None:
+        return "normal", ""
+    budget = total - MEMORY_OS_RESERVE_GB
+    if est["normal"] <= budget:
+        return "normal", ""
+    if est["ssd"] <= budget:
+        return "ssd", "💾 SSD (auto — not enough memory for normal mode)"
+    return "ssd", "💾 SSD (auto — low memory even for SSD, expect swapping)"
+
 # --- image-mode (одна картинка вместо видео) -------------------------------
 # У h3.c нет нативного режима "просто одна картинка" — минимальная единица
 # генерации это один декодерный чанк видео-VAE, который h3_align_frame_count()
@@ -387,7 +435,8 @@ async def _run_h3(job_id: str, argv: list[str]):
                 send_generation_event,
                 edition=EDITION,
                 mode=job.get("mode", "video"),
-                preset=job.get("preset", ""),
+                # "+ssd" marks low-memory runs, so the stats can compare modes
+                preset=job.get("preset", "") + ("+ssd" if "--ssd-streaming" in (job.get("argv") or []) else ""),
                 resolution=job.get("resolution", ""),
                 seconds=job.get("seconds"),
                 frames=job.get("frames"),
@@ -574,6 +623,7 @@ async def generate(
     first_frame: Optional[UploadFile] = File(None),
     last_frame: Optional[UploadFile] = File(None),
     ref_images: list[UploadFile] = File(default=[]),
+    memory_mode: str = Form("auto"),  # "auto" | "normal" | "ssd"
 ):
     job_id = uuid.uuid4().hex[:12]
     jdir = _job_dir(job_id)
@@ -594,6 +644,13 @@ async def generate(
                   frames=frames, preset=preset, steps=steps, layers=layers,
                   reuse=reuse, seed=seed, token_reduction=token_reduction, mode=mode)
     argv = _build_argv(job_id, params, first_frame_path, last_frame_path, ref_paths)
+    _fr = _argv_value(argv, "--frames")
+    _sec = _argv_value(argv, "--seconds")
+    _frames = int(_fr) if _fr else int(round(float(_sec or 5) * 24))
+    mem_mode, mem_label = _choose_memory_mode(memory_mode if memory_mode in ("auto", "normal", "ssd") else "auto",
+                                              width, height, _frames)
+    if mem_mode == "ssd" and "--ssd-streaming" not in argv:
+        argv.append("--ssd-streaming")
     # реальные steps/layers/reuse берём из уже собранного argv, а не из params —
     # там при preset != "custom" они всё ещё None (сырые form-данные с фронта)
     argv_layers = _argv_value(argv, "--layers")
@@ -616,6 +673,7 @@ async def generate(
         "reuse": int(argv_reuse) if argv_reuse else None,
         "ref_image_count": len(ref_paths),
         "has_frame_anchor": bool(first_frame_path or last_frame_path),
+        "memory_mode_label": mem_label,
     }
     await job_queue.put(job_id)
     return {"job_id": job_id}
@@ -706,7 +764,18 @@ async def system_status():
         "max_pixels": MAX_PIXELS,
         "low_ram_warning_free_gb": LOW_RAM_WARNING_FREE_GB,
         "low_ram_warning_min_layers": LOW_RAM_WARNING_MIN_LAYERS,
+        "total_ram_gb": _total_ram_gb(),
     }
+
+
+@app.get("/api/memory-estimate")
+async def memory_estimate(width: int, height: int, seconds: float = 5.0, memory_mode: str = "auto"):
+    """Peak-memory estimate for the form hint and the "Auto" choice."""
+    frames = int(round(seconds * 24))
+    est = _estimate_peak_gb(width, height, frames)
+    mode, label = _choose_memory_mode(memory_mode, width, height, frames)
+    return {**est, "total_ram_gb": _total_ram_gb(), "reserve_gb": MEMORY_OS_RESERVE_GB,
+            "mode": mode, "label": label}
 
 
 @app.get("/api/settings/telemetry")

@@ -24,6 +24,11 @@
   h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
   label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
   .field { display: flex; flex-direction: column; gap: 4px; }
+  .seed-btn {
+    flex: 0 0 auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .seed-btn:hover { border-color: var(--accent); color: var(--accent); }
   textarea, input[type=text], input[type=number], select {
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
     padding: 8px 10px; border-radius: 8px; font-size: 14px; width: 100%; font-family: inherit;
@@ -184,12 +189,25 @@
   <div class="row">
     <div class="field">
       <label>Seed (empty = h3 default 42)</label>
-      <input type="number" id="seed" placeholder="42">
+      <div style="display:flex; gap:6px;">
+        <input type="number" id="seed" placeholder="42" style="flex:1;">
+        <button type="button" id="seed-default" class="seed-btn" title="Reset to default (42)">42</button>
+        <button type="button" id="seed-random" class="seed-btn" title="Randomize seed">🎲</button>
+      </div>
     </div>
   </div>
 
+  <div class="field" style="margin-bottom:10px;">
+    <label>Memory</label>
+    <select id="memory-mode">
+      <option value="auto">Auto (picks based on this Mac's memory)</option>
+      <option value="normal">Normal (faster, more memory)</option>
+      <option value="ssd">Low-memory SSD (1.1–1.5× slower, ~half the memory)</option>
+    </select>
+    <div class="hint" id="memory-hint"></div>
+  </div>
+
   <button class="primary" id="generate">Generate</button>
-  <div class="hint">Balanced ≈ 512² in seconds on M5 Max. Quality is noticeably pricier — use it for the final pass, not for iterating.</div>
   <div id="ram-warning" style="display:none; margin-top:8px; padding:8px 10px; border:1px solid var(--warn); border-radius:6px; color:var(--warn); font-size:12px;"></div>
 
   <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
@@ -197,7 +215,11 @@
       <input type="checkbox" id="telemetry-toggle" style="accent-color: var(--accent); width:15px; height:15px; margin:0;">
       <span style="color: var(--text); font-size:13px;">Share anonymous usage stats</span>
     </label>
-    <div class="hint" style="margin-top:6px;">Helps improve performance across hardware. No prompts, files, images, or personal info are ever sent.</div>
+    <div class="hint" style="margin-top:6px;">Helps us tune the engine for smaller Macs (16–32 GB) — the low-memory SSD mode is new and we need real numbers from real machines. No prompts, files, images, results or personal info are ever sent.</div>
+    <details class="hint" style="margin-top:4px;">
+      <summary style="cursor:pointer;">What exactly is sent</summary>
+      One small record per finished generation: app edition and version, Mac model and chip, macOS version, total RAM, free RAM at start, peak memory of the engine, memory pressure (page-outs), resolution, length, steps/layers/preset, memory mode, number of reference images (not the images), whether a first/last frame was used, duration, success or error code, and a random install ID (not tied to you). Turn it off here at any time, or start with <code>H3_TELEMETRY=0</code>.
+    </details>
   </div>
 </aside>
 
@@ -244,6 +266,12 @@ document.querySelectorAll('[data-preset]').forEach(el => el.addEventListener('cl
   updateRamWarning();
 }));
 document.getElementById('resolution').addEventListener('change', updateRamWarning);
+(function () {
+  const sel = document.getElementById('memory-mode');
+  try { const v = localStorage.getItem('h3_memory_mode'); if (v) sel.value = v; } catch (e) {}
+  sel.addEventListener('change', () => { try { localStorage.setItem('h3_memory_mode', sel.value); } catch (e) {} updateMemoryHint(); });
+  document.getElementById('seconds').addEventListener('input', updateMemoryHint);
+})();
 document.getElementById('layers').addEventListener('input', updateRamWarning);
 
 document.querySelectorAll('#jobs-tabs [data-view]').forEach(el => el.addEventListener('click', () => {
@@ -343,7 +371,30 @@ function currentLayers() {
   return PRESET_LAYERS[activePreset()] || 0;
 }
 
+// Peak-memory estimate + memory mode (server: /api/memory-estimate)
+var memHintTimer = null; // var, not let: updateRamWarning() runs during page load before this line (TDZ)
+function updateMemoryHint() {
+  clearTimeout(memHintTimer);
+  memHintTimer = setTimeout(async () => {
+    const el = document.getElementById('memory-hint');
+    const sel = document.getElementById('memory-mode');
+    const res = document.getElementById('resolution');
+    if (!el || !sel || !res || !res.value) return;
+    const [w, h] = res.value.split('x').map(Number);
+    const sec = genMode === 'image' ? 1 : (Number(document.getElementById('seconds').value) || 5);
+    try {
+      const d = await (await fetch(`/api/memory-estimate?width=${w}&height=${h}&seconds=${sec}&memory_mode=${sel.value}`)).json();
+      let txt = `Peak memory ≈ ${d.normal} GB normal / ${d.ssd} GB SSD`;
+      if (d.total_ram_gb) txt += ` · this Mac has ${Math.round(d.total_ram_gb)} GB`;
+      if (sel.value === 'auto') txt += d.mode === 'ssd' ? ' → will use SSD' : ' → will use normal';
+      el.textContent = txt;
+      el.style.color = (d.total_ram_gb && (d.mode === 'ssd' ? d.ssd : d.normal) > d.total_ram_gb - d.reserve_gb) ? 'var(--warn)' : '';
+    } catch (e) { el.textContent = ''; }
+  }, 250);
+}
+
 function updateRamWarning() {
+  updateMemoryHint();
   const el = document.getElementById('ram-warning');
   if (!el || !systemStatus || systemStatus.free_ram_gb == null) { if (el) el.style.display = 'none'; return; }
   const [w, h] = document.getElementById('resolution').value.split('x').map(Number);
@@ -395,6 +446,7 @@ async function generate() {
   fd.append('mode', genMode);
   if (genMode !== 'image') fd.append('seconds', document.getElementById('seconds').value);
   fd.append('preset', activePreset());
+  fd.append('memory_mode', document.getElementById('memory-mode').value);
   if (activePreset() === 'custom') {
     fd.append('steps', document.getElementById('steps').value);
     fd.append('layers', document.getElementById('layers').value);
@@ -425,6 +477,17 @@ async function generate() {
   }
 }
 document.getElementById('generate').addEventListener('click', generate);
+
+// Seed buttons next to the seed field (2026-09-17, ComfyUI-style): "42" resets
+// to h3's default, the dice sets a random seed within int32 range (h3 takes a
+// plain integer for --seed, see h3_cli.c usage).
+document.getElementById('seed-default').addEventListener('click', () => {
+  document.getElementById('seed').value = 42;
+});
+document.getElementById('seed-random').addEventListener('click', () => {
+  document.getElementById('seed').value = Math.floor(Math.random() * 2147483647);
+});
+
 
 const telemetryToggle = document.getElementById('telemetry-toggle');
 fetch('/api/settings/telemetry').then(r => r.json()).then(d => {
@@ -529,7 +592,7 @@ function updateCard(ref, job) {
   ref.statusEl.className = 'status ' + job.status;
   const queueSuffix = (job.status === 'queued' && job.queue_position)
     ? ` (#${job.queue_position} in queue)` : '';
-  ref.statusEl.textContent = `${job.status}${queueSuffix} ${fmtElapsed(job)}`;
+  ref.statusEl.textContent = `${job.status}${queueSuffix} ${fmtElapsed(job)}${job.memory_mode_label ? ' · ' + job.memory_mode_label : ''}`;
 
   ref.cancelWrap.innerHTML = (job.status === 'running' || job.status === 'queued')
     ? `<button class="cancel" data-cancel="${job.id}">Cancel</button>` : '';

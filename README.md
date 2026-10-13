@@ -9,6 +9,7 @@ A native macOS GUI for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3)
 - Text-to-video and text-to-image generation with h3.c, through a simple web UI (opens in your browser, served locally).
 - Speed/quality presets (Draft / Balanced / Quality) plus a Custom mode for manual `steps` / `layers` / `reuse`.
 - Reference modes: first/last-frame anchoring, or up to 3 reference images.
+- **Memory modes for smaller Macs** — Normal, Low-memory SSD, or Auto (see below).
 - An Active / History view — history survives server and browser restarts: it's rebuilt from what's already in `outputs/` and `server/jobs/`, so nothing generated is lost between sessions.
 - A one-click `.app` launcher — no terminal required for day-to-day use.
 
@@ -38,6 +39,42 @@ On a fresh clone, the launcher has nothing to work with yet: no `h3.c` engine, n
 3. Downloads the model weights (~210 GB — this is the slow part, easily hours depending on your connection).
 
 Once that's done, the server starts and your browser opens automatically. Every run after that is instant — the launcher just checks whether the server's already up and opens the browser, or starts it in the background if not.
+
+## Smaller Macs: memory modes
+
+Next to the Generate button there's a **Memory** setting:
+
+- **Normal** — fastest. The whole transformer stays in memory.
+- **Low-memory SSD** — the engine streams the transformer weights from your SSD two blocks at a time (`--ssd-streaming`, built into h3.c). Peak memory roughly halves; generation is 1.1–1.5× slower (the gap shrinks on longer, larger clips).
+- **Auto** (default) — estimates the peak for your resolution and length and picks Normal if it fits in this Mac's memory (with ~8 GB left for macOS), otherwise SSD. The hint under the setting shows the estimate, and the job card shows "💾 SSD" when it was used.
+
+Measured peak memory on an M5 Max (44 benchmark runs):
+
+| Clip | Normal | Low-memory SSD |
+|---|---|---|
+| 576×1024, 5 s | ~20 GB | ~11 GB |
+| 768×1344, 5 s | ~23 GB | ~12 GB |
+| 576×1024, 15 s | ~27 GB | ~14 GB |
+| 576×1024, 30 s | ~39 GB | ~27 GB |
+
+Rough guide: 48 GB+ Macs can run Normal for almost everything; 32 GB runs Normal for short clips and SSD for longer or larger ones; 24 GB needs SSD; 16 GB is a tight squeeze even with SSD (short clips, expect some swapping).
+
+These numbers come from one big machine. **Real 16–32 GB Macs are exactly what we can't test ourselves** — that's what the anonymous stats below are for.
+
+## Anonymous usage stats
+
+The app can send one small anonymous record per finished generation so we can see how the engine behaves on hardware we don't own and tune the memory modes for smaller Macs. It's on by default and can be switched off at any time with the **Share anonymous usage stats** checkbox in the sidebar (or by starting the server with `H3_TELEMETRY=0`).
+
+**Never sent:** prompts, images, videos, file names or paths, generation results, your name, email, or anything that identifies you.
+
+**Sent** (and nothing else — see `server/telemetry_client.py`):
+
+- app edition and version; a random install ID created on first run (not linked to you or your Apple ID)
+- Mac model, chip, macOS version
+- total RAM, free RAM at the start of the generation, peak memory used by the engine, memory pressure during the run (page-outs)
+- resolution, length in seconds/frames, steps / layers / reuse / preset, memory mode (Normal or SSD)
+- how many reference images were used (just the count) and whether a first/last frame was used
+- how long it took, and whether it succeeded (an exit code if not)
 
 ## Lite vs. Pro
 
