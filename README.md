@@ -48,14 +48,13 @@ Next to the Generate button there's a **Memory** setting:
 - **Low-memory SSD** — the engine streams the transformer weights from your SSD two blocks at a time (`--ssd-streaming`, built into h3.c). Peak memory roughly halves; generation is 1.1–1.5× slower (the gap shrinks on longer, larger clips).
 - **Auto** (default) — estimates the peak for your resolution and length and picks Normal if it fits in this Mac's memory (with ~8 GB left for macOS), otherwise SSD. The hint under the setting shows the estimate, and the job card shows "💾 SSD" when it was used.
 
-Measured peak memory on an M5 Max (44 benchmark runs):
+Measured peak memory on an M5 Max (benchmark runs within the engine's 4–15 s range):
 
 | Clip | Normal | Low-memory SSD |
 |---|---|---|
 | 576×1024, 5 s | ~20 GB | ~11 GB |
 | 768×1344, 5 s | ~23 GB | ~12 GB |
 | 576×1024, 15 s | ~27 GB | ~14 GB |
-| 576×1024, 30 s | ~39 GB | ~27 GB |
 
 Rough guide: 48 GB+ Macs can run Normal for almost everything; 32 GB runs Normal for short clips and SSD for longer or larger ones; 24 GB needs SSD; 16 GB is a tight squeeze even with SSD (short clips, expect some swapping).
 
