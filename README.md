@@ -1,13 +1,15 @@
 # MiniMax H3 — Lite
 
-A native macOS GUI for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) (built on [antirez/h3.c](https://github.com/antirez/h3.c)) — local text-to-video and text-to-image generation, no ComfyUI, no cloud, no API keys. Everything runs on your own Apple Silicon Mac.
+A free Mac app for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) (built on [antirez/h3.c](https://github.com/antirez/h3.c)): one-click setup and model download, then a simple local UI in your browser for text-to-video and text-to-image. No ComfyUI, no cloud, no API keys — everything runs on your own Apple Silicon Mac.
 
 ![platform](https://img.shields.io/badge/platform-Apple%20Silicon-black) ![license](https://img.shields.io/badge/license-source--available-blue)
+
+![MiniMax H3 Lite](docs/screenshot.png)
 
 ## What it does
 
 - Text-to-video and text-to-image generation with h3.c, through a simple web UI (opens in your browser, served locally).
-- Speed/quality presets (Draft / Balanced / Quality) plus a Custom mode for manual `steps` / `layers` / `reuse`.
+- Speed/quality presets (Draft 8 steps / Balanced 20 / Quality 50) plus a Custom mode for manual `steps` / `layers` / `reuse`.
 - Reference modes: first/last-frame anchoring, or up to 3 reference images.
 - **Memory modes for smaller Macs** — Normal, Low-memory SSD, or Auto (see below).
 - An Active / History view — history survives server and browser restarts: it's rebuilt from what's already in `outputs/` and `server/jobs/`, so nothing generated is lost between sessions.

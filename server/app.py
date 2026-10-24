@@ -69,7 +69,7 @@ for d in (JOBS_DIR, OUTPUTS_DIR):
 # --- валидированные пресеты из README h3.c -----------------------------
 # (steps, layers, reuse) — см. таблицу "Choose a speed/quality preset"
 PRESETS = {
-    "draft":    {"steps": 4,  "layers": 50, "reuse": 1},   # ~3.5s/22 кадра на M5 Max
+    "draft":    {"steps": 8,  "layers": 50, "reuse": 1},   # 4 steps left half the frame blurred (steps sweep 2026-09-09); 8 is the clean minimum
     "balanced": {"steps": 20, "layers": 45, "reuse": 2},   # рекомендованная стартовая точка
     "quality":  {"steps": 50, "layers": 50, "reuse": 1},   # close-reference оракул, дорого
 }

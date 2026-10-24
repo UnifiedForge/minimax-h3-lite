@@ -24,6 +24,7 @@
   h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
   label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
   .field { display: flex; flex-direction: column; gap: 4px; }
+  .tab.active .hint { color: inherit; opacity: .75; }
   .seed-btn {
     flex: 0 0 auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
     border-radius: 8px; padding: 8px 10px; font-size: 13px; cursor: pointer; font-family: inherit;
@@ -174,7 +175,7 @@
   <div>
     <h1>Speed / quality</h1>
     <div class="tabs">
-      <div class="tab" data-preset="draft">Draft<br><span class="hint">4 steps</span></div>
+      <div class="tab" data-preset="draft">Draft<br><span class="hint">8 steps</span></div>
       <div class="tab active" data-preset="balanced">Balanced<br><span class="hint">20 steps</span></div>
       <div class="tab" data-preset="quality">Quality<br><span class="hint">50 steps</span></div>
       <div class="tab" data-preset="custom">Custom</div>
