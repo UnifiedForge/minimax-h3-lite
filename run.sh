@@ -26,7 +26,7 @@ source "$DIR/_bootstrap_engine.sh"
 # нужно (весь ввод — через диалоговые окна поверх), но человеку видно, что
 # процесс идёт, а не тишина без понятия — зависло или работает. Если всё уже
 # готово — работаем тихо в фоне, как обычно.
-if [ -z "${H3_IN_TERMINAL:-}" ] && bootstrap_needed; then
+if [ -z "${H3_IN_TERMINAL:-}" ] && { bootstrap_needed || [ ! -d "$DIR/server/venv" ]; }; then
   export H3_IN_TERMINAL=1
   osascript -e "tell application \"Terminal\" to do script \"H3_IN_TERMINAL=1 '$DIR/run.sh'\"" >/dev/null 2>&1
   exit 0
@@ -35,6 +35,7 @@ fi
 bootstrap_engine
 
 if [ ! -d venv ]; then
+  echo "First run: installing the Python packages UnifiedForge needs — a few minutes, the browser opens by itself when it is done."
   python3 -m venv venv
 fi
 source venv/bin/activate
@@ -49,6 +50,7 @@ if ! python3 -c "" >/dev/null 2>&1; then
 fi
 python3 -m pip --version >/dev/null 2>&1 || python3 -m ensurepip --upgrade
 python3 -m pip install -q -r requirements.txt --break-system-packages
+echo "Starting the server…"
 
 uvicorn app:app --host 127.0.0.1 --port $PORT &
 SERVER_PID=$!

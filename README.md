@@ -6,6 +6,8 @@ A free Mac app for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) (bu
 
 ![MiniMax H3 Lite](docs/screenshot.png)
 
+> Want more? **UnifiedForge Pro** adds runtime LoRAs, characters, the prompt enhancer and more references — available to members on [Patreon](https://www.patreon.com/UnifiedForge).
+
 ## What it does
 
 - Text-to-video and text-to-image generation with h3.c, through a simple web UI (opens in your browser, served locally).
@@ -85,6 +87,8 @@ This is the free, source-available edition. A couple of things are intentionally
 - No prompt-enhancer (an LLM-assisted prompt expansion feature, Pro-only).
 
 Everything else — presets, both generation modes, the first/last-frame anchor mode, history — is the same engine and the same UI.
+
+Pro also adds runtime LoRAs, saved characters, generation resume and more. Get it on [Patreon](https://www.patreon.com/UnifiedForge).
 
 ## About the model license
 
