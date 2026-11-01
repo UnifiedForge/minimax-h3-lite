@@ -19,6 +19,17 @@ ENGINE_DIR="${H3_ENGINE_DIR:-$REPO_ROOT/engine}"
 H3_SRC="$ENGINE_DIR/h3c-src"
 H3_BIN="$H3_SRC/h3"
 MODEL_DIR="$ENGINE_DIR/MiniMax-H3"
+# Engine source: the UnifiedForge fork of h3.c (antirez/h3.c + neokree runtime
+# LoRA + M5 fixes): https://github.com/UnifiedForge/h3.c
+H3_REPO="https://github.com/UnifiedForge/h3.c"
+
+# Older installs cloned antirez/h3.c directly. Move them to the fork once, but
+# only if the tree has no local edits (a developer's patched tree is left alone).
+_needs_engine_migration() {
+  [ -d "$H3_SRC/.git" ] || return 1
+  git -C "$H3_SRC" remote get-url origin 2>/dev/null | grep -q "antirez/h3.c" || return 1
+  git -C "$H3_SRC" diff --quiet 2>/dev/null && git -C "$H3_SRC" diff --cached --quiet 2>/dev/null
+}
 
 _dialog() {
   # простой информационный диалог с одной кнопкой OK — блокирует до клика,
@@ -36,16 +47,28 @@ _ask_token() {
 # run.sh работает тихо в фоне как обычно.
 bootstrap_needed() {
   mkdir -p "$ENGINE_DIR" 2>/dev/null
-  [ ! -x "$H3_BIN" ] || [ ! -d "$MODEL_DIR/FL2VA" ]
+  [ ! -x "$H3_BIN" ] || [ ! -d "$MODEL_DIR/FL2VA" ] || _needs_engine_migration
 }
 
 bootstrap_engine() {
   mkdir -p "$ENGINE_DIR"
 
-  # 1. исходники h3.c (antirez/h3.c) — если их вообще нет
+  # 0. one-time move of an older antirez/h3.c clone to the UnifiedForge fork
+  if _needs_engine_migration; then
+    _dialog "Updating the h3.c engine to the UnifiedForge build (fixes a grid artifact on some resolutions and nondeterministic results on long prompts). It will be rebuilt now — a minute or two."
+    if git -C "$H3_SRC" remote set-url origin "$H3_REPO" && git -C "$H3_SRC" fetch origin main \
+       && git -C "$H3_SRC" checkout -q -B main origin/main; then
+      rm -f "$H3_BIN"   # rebuilt in step 2 from the new source
+    else
+      git -C "$H3_SRC" remote set-url origin https://github.com/antirez/h3.c
+      _dialog "Couldn't update the engine (no internet?) — keeping the current one. It will try again next launch."
+    fi
+  fi
+
+  # 1. h3.c source (UnifiedForge fork) — if it's not here at all
   if [ ! -d "$H3_SRC" ]; then
-    _dialog "This is the first run on this machine — the h3.c engine isn't downloaded yet. Cloning the source (antirez/h3.c from GitHub) and building it now — a minute or two. Progress is visible in this Terminal window."
-    if ! git clone https://github.com/antirez/h3.c "$H3_SRC"; then
+    _dialog "This is the first run on this machine — the h3.c engine isn't downloaded yet. Cloning the source (UnifiedForge/h3.c on GitHub, a fork of antirez/h3.c) and building it now — a minute or two. Progress is visible in this Terminal window."
+    if ! git clone "$H3_REPO" "$H3_SRC"; then
       _dialog "Failed to clone h3.c — check your internet connection and run the launcher again. (Requires git, which comes with Xcode Command Line Tools.)"
       exit 1
     fi

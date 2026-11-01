@@ -1,6 +1,6 @@
 # MiniMax H3 — Lite
 
-A free Mac app for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) (built on [antirez/h3.c](https://github.com/antirez/h3.c)): one-click setup and model download, then a simple local UI in your browser for text-to-video and text-to-image. No ComfyUI, no cloud, no API keys — everything runs on your own Apple Silicon Mac.
+A free Mac app for [MiniMax H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) (built on [h3.c](https://github.com/UnifiedForge/h3.c), our maintained fork of [antirez/h3.c](https://github.com/antirez/h3.c)): one-click setup and model download, then a simple local UI in your browser for text-to-video and text-to-image. No ComfyUI, no cloud, no API keys — everything runs on your own Apple Silicon Mac.
 
 ![platform](https://img.shields.io/badge/platform-Apple%20Silicon-black) ![license](https://img.shields.io/badge/license-source--available-blue)
 
@@ -110,4 +110,5 @@ Source-available — see [`LICENSE.md`](./LICENSE.md). In short: you can view, r
 ## Credits
 
 - [antirez/h3.c](https://github.com/antirez/h3.c) — the inference engine this wraps.
+- [UnifiedForge/h3.c](https://github.com/UnifiedForge/h3.c) — the fork the setup downloads: antirez/h3.c plus [neokree](https://github.com/neokree/h3.c)'s runtime LoRA and fixes (VAE grid artifact, nondeterminism on long prompts, M5 speedups). Older installs that cloned antirez/h3.c are moved to it once, automatically, if the engine folder has no local edits.
 - [MiniMaxAI/MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) — the model weights.
